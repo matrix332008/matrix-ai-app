@@ -18,15 +18,17 @@ body{background:#000;display:flex;align-items:center;justify-content:center;min-
 .lang{display:grid;grid-template-columns:1fr 1fr;background:#1A1A1A;border-radius:28px;padding:5px;margin:28px auto;max-width:340px;border:1px solid #252525;position:relative;height:58px} 
 .lang::after{content:'';position:absolute;left:50%;top:25%;height:50%;width:1px;background:#333}
 .lang button{border:0;background:0;color:#777;height:48px;border-radius:22px;font-weight:700;font-size:17px;display:flex;align-items:center;justify-content:center;gap:8px;font-family:'Cairo';cursor:pointer} 
-.lang .on{background:linear-gradient(135deg,#FFC300,#FFB000);color:#000;margin:5px} 
+.lang.on{background:linear-gradient(135deg,#FFC300,#FFB000);color:#000;margin:5px} 
 .input{position:relative;margin-top:22px} 
-.input input{width:100%;height:58px;background:#1A1A1A;border:2px solid #8B5CF6;border-radius:18px;padding:0 16px;color:#888;font-size:17px;text-align:right;font-family:'Cairo'} 
+.input input{width:100%;height:58px;background:#1A1A1A;border:2px solid #8B5CF6;border-radius:18px;padding:0 16px;color:#fff;font-size:17px;text-align:right;font-family:'Cairo'} 
+.input input::placeholder{color:#888}
 h3{text-align:center;margin:30px 0 16px;font-size:21px;font-weight:700} 
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px} 
 .btn{height:64px;border-radius:18px;display:flex;align-items:center;justify-content:center;gap:12px;font-weight:800;font-size:20px;border:2px solid #8B5CF6;background:#1A1A1A;color:#3B82F6;font-family:'Cairo';cursor:pointer} 
 .btn span{font-size:24px}
 .btn.on{background:linear-gradient(135deg,#FFC300,#FFB000);color:#000;border-color:#FFC300} 
 .big{width:100%;height:68px;margin-top:14px;background:linear-gradient(135deg,#FFC300,#FFB000);border:0;border-radius:18px;color:#000;font-size:23px;font-weight:900;display:flex;align-items:center;justify-content:center;gap:12px;font-family:'Cairo';cursor:pointer} 
+.big:disabled{opacity:0.5;cursor:not-allowed}
 .trend-title{font-size:18px;margin:25px 0 12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px} 
 .trend-title i{color:#FF6B00}
 .trend{background:#1A1A1A;border:2px solid #8B5CF6;border-radius:16px;padding:12px;display:flex;gap:12px;align-items:center;position:relative} 
@@ -39,6 +41,10 @@ nav a{color:#666;text-decoration:none;font-size:12px;display:flex;flex-direction
 nav a.on{color:#FFC300} 
 nav a i{font-size:24px}
 .plus{width:58px;height:58px;background:#8B5CF6;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:28px;margin-top:-28px;box-shadow:0 0 25px rgba(139,92,246,0.8)}
+.loading{display:none;text-align:center;margin-top:20px}
+.loading.show{display:block}
+.spinner{border:4px solid #1A1A1A;border-top:4px solid #FFC300;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:0 auto}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -70,41 +76,46 @@ nav a i{font-size:24px}
     </div>
 
     <div class="lang">
-      <button>🇨🇿 Čeština</button>
-      <button class="on">عربي 🇹🇳</button>
+      <button data-lang="cs">🇨🇿 Čeština</button>
+      <button data-lang="ar" class="on">عربي 🇹🇳</button>
     </div>
 
     <div class="input">
-      <input placeholder="شنوة الحكاية اللي تحب تعملها اليوم؟">
+      <input id="storyInput" data-ar="شنوة الحكاية اللي تحب تعملها اليوم؟" data-cs="Jaký příběh chceš dnes vytvořit?" placeholder="شنوة الحكاية اللي تحب تعملها اليوم؟">
     </div>
 
-    <h3>الستايل</h3>
+    <h3 data-ar="الستايل" data-cs="Styl">الستايل</h3>
     <div class="grid">
-      <button class="btn on"><span>🎭</span> دراما</button>
-      <button class="btn"><span>⚡</span> تحفيزي</button>
-      <button class="btn"><span>😀</span> مضحك</button>
-      <button class="btn"><span>👻</span> رعب</button>
+      <button class="btn style-btn on" data-style="drama" data-ar="دراما" data-cs="Drama"><span>🎭</span> دراما</button>
+      <button class="btn style-btn" data-style="action" data-ar="اكشن" data-cs="Akční"><span>💥</span> اكشن</button>
+      <button class="btn style-btn" data-style="funny" data-ar="مضحك" data-cs="Vtipný"><span>😀</span> مضحك</button>
+      <button class="btn style-btn" data-style="horror" data-ar="رعب" data-cs="Horor"><span>👻</span> رعب</button>
     </div>
 
-    <h3>اختر الصوت</h3>
-    <button class="big"><i class="fas fa-microphone"></i> ولّد الفيديو <i class="fas fa-wand-magic-sparkles"></i></button>
+    <h3 data-ar="اختر الصوت" data-cs="Vyber hlas">اختر الصوت</h3>
+    <button class="big" id="generateBtn"><i class="fas fa-microphone"></i> <span data-ar="ولّد الفيديو" data-cs="Vytvořit video">ولّد الفيديو</span> <i class="fas fa-wand-magic-sparkles"></i></button>
 
-    <h3 class="trend-title"><i class="fas fa-fire"></i> ترند اليوم</h3>
+    <div class="loading" id="loader">
+      <div class="spinner"></div>
+      <p data-ar="جاري توليد الفيديو..." data-cs="Generuji video...">جاري توليد الفيديو...</p>
+    </div>
+
+    <h3 class="trend-title"><i class="fas fa-fire"></i> <span data-ar="ترند اليوم" data-cs="Dnešní trend">ترند اليوم</span></h3>
     <div class="trend">
-      <span class="badge">#1 ترند</span>
+      <span class="badge" data-ar="#1 ترند" data-cs="#1 Trend">#1 ترند</span>
       <img src="https://i.imgur.com/8QfV45F.jpeg">
       <div>
-        <div class="title">قصة خيال في تونس القديمة</div>
-        <div class="meta">فيديو اليوم • 12 د • 1.2k</div>
+        <div class="title" data-ar="قصة خيال في تونس القديمة" data-cs="Fantasy příběh ze starého Tuniska">قصة خيال في تونس القديمة</div>
+        <div class="meta" data-ar="فيديو اليوم • 12 د • 1.2k" data-cs="Dnešní video • 12 min • 1.2k">فيديو اليوم • 12 د • 1.2k</div>
       </div>
     </div>
   </div>
   <nav>
-    <a class="on"><i class="fas fa-home"></i><span>الرئيسية</span></a>
-    <a><i class="fas fa-search"></i><span>اكتشاف</span></a>
-    <a><div class="plus"><i class="fas fa-plus"></i></div><span>إنشاء</span></a>
-    <a><i class="fas fa-folder-open"></i><span>المكتبة</span></a>
-    <a><i class="fas fa-user-circle"></i><span>حسابي</span></a>
+    <a class="on"><i class="fas fa-home"></i><span data-ar="الرئيسية" data-cs="Domů">الرئيسية</span></a>
+    <a><i class="fas fa-search"></i><span data-ar="اكتشاف" data-cs="Objevit">اكتشاف</span></a>
+    <a><div class="plus"><i class="fas fa-plus"></i></div><span data-ar="إنشاء" data-cs="Vytvořit">إنشاء</span></a>
+    <a><i class="fas fa-folder-open"></i><span data-ar="المكتبة" data-cs="Knihovna">المكتبة</span></a>
+    <a><i class="fas fa-user-circle"></i><span data-ar="حسابي" data-cs="Účet">حسابي</span></a>
   </nav>
 </div>
 <script src="app.js"></script>
