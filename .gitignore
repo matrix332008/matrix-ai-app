@@ -1,0 +1,41 @@
+# ملفات السيستام
+.DS_Store
+Thumbs.db
+
+# مجلدات الـ dependencies
+node_modules/
+venv/
+__pycache__/
+
+# ملفات البيئة - السرية! 🔐
+.env
+.env.local
+.env.*.local
+*.pem
+
+# ملفات الـ Build
+/build/
+/dist/
+*.apk
+*.ipa
+
+# ملفات Flutter
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+
+# ملفات Python
+*.pyc
+*.pyo
+*.pyd
+
+# ملفات الـ IDE
+.vscode/
+.idea/
+
+# فيديوهات وصور التجربة
+*.mp4
+*.mov
+*.png
+*.jpg
