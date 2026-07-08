@@ -10,7 +10,8 @@ const translations = {
     alertEmpty: 'اكتب الحكاية الأول يا معلم',
     alertDone: 'تم توليد فيديو MP4 بصوت تونسي! 🎉',
     generating: '🚀 نسخنو في الموتور التونسي...',
-    generating2: 'قاعد نولد فيديو MP4 بصوت Reem...',
+    generating_male: 'قاعد نولد فيديو MP4 بصوت Hedi الراجل التونسي...',
+    generating_female: 'قاعد نولد فيديو MP4 بصوت Reem المرا التونسية...',
     resultTitle: 'الفيديو التونسي MP4 جاهز!',
     backHome: 'رجوع للرئيسية',
     download: 'تحميل الفيديو MP4 📥',
@@ -22,7 +23,7 @@ const translations = {
   },
   cs: {
     alertEmpty: 'Nejprve napiš příběh', alertDone: 'Video hotové! 🎉',
-    generating: '🚀 Startuji motor...', generating2: 'Generuji MP4 video...',
+    generating: '🚀 Startuji motor...', generating_male: 'Generuji s hlasem Antonin...', generating_female: 'Generuji s hlasem Vlasta...',
     resultTitle: 'MP4 video je hotové!',
     backHome: 'Zpět domů', download: 'Stáhnout MP4 📥', share: 'Sdílet TikTok / Facebook',
     story: 'Příběh:', style: 'Styl:', voice: 'Hlas:', male: 'Muž', female: 'Žena',
@@ -64,38 +65,45 @@ document.querySelectorAll('.lang button').forEach(btn=>{
   };
 });
 document.querySelectorAll('.style-btn').forEach(btn=>{ btn.onclick=()=>{ document.querySelectorAll('.style-btn').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); currentStyle=btn.dataset.style; }; });
-document.querySelectorAll('.voice-btn').forEach(btn=>{ btn.onclick=()=>{ document.querySelectorAll('.voice-btn').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); currentVoice=btn.dataset.voice; }; });
 
-// *** مصلح: يفيق السيرفر اوتوماتيك بدون Error ***
+// *** مصلح صوت راجل/مرا ***
+document.querySelectorAll('.voice-btn').forEach(btn=>{
+  btn.onclick=()=>{
+    document.querySelectorAll('.voice-btn').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    currentVoice = btn.dataset.voice;
+    console.log("VOICE SELECTED:", currentVoice);
+  };
+});
+
 document.getElementById('generateBtn').onclick = async ()=>{
   const story=document.getElementById('storyInput').value.trim();
   if(!story) return alert(translations[currentLang].alertEmpty);
+  const selectedVoice = currentVoice; // نحفظو الصوت اللي اختارو قبل ما نبدا
   const btn=document.getElementById('generateBtn'), loader=document.getElementById('loader');
   const pEl=loader.querySelector('p'); const oldText=pEl.textContent;
   btn.disabled=true; loader.classList.add('show');
 
   async function generateWithRetry(){
-    // محاولة 1
     try{
       pEl.textContent = translations[currentLang].generating;
-      await fetch(`${BACKEND_URL}/health`).catch(()=>{}); // ping خفيف
+      await fetch(`${BACKEND_URL}/health`).catch(()=>{});
       await new Promise(r=>setTimeout(r,3000));
-      pEl.textContent = translations[currentLang].generating2;
+      pEl.textContent = selectedVoice==='male'? translations[currentLang].generating_male : translations[currentLang].generating_female;
       const res = await fetch(`${BACKEND_URL}/video/generate`,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({prompt: story, language: currentLang, style: currentStyle, voice: currentVoice})
+        body: JSON.stringify({prompt: story, language: currentLang, style: currentStyle, voice: selectedVoice})
       });
       if(res.ok) return await res.blob();
       throw new Error();
     }catch(e){
-      // محاولة 2 اوتوماتيك بعد 15 ثانية - بدون alert
       pEl.textContent = currentLang==='ar'? '⏳ الموتور قاعد يسخن... 15 ثانية برك' : '⏳ Warming up... 15s';
       await new Promise(r=>setTimeout(r,15000));
       const res2 = await fetch(`${BACKEND_URL}/video/generate`,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({prompt: story, language: currentLang, style: currentStyle, voice: currentVoice})
+        body: JSON.stringify({prompt: story, language: currentLang, style: currentStyle, voice: selectedVoice})
       });
       if(res2.ok) return await res2.blob();
       throw new Error();
@@ -105,8 +113,8 @@ document.getElementById('generateBtn').onclick = async ()=>{
   try{
     const blob = await generateWithRetry();
     finalVideoBlob = blob;
-    saveVideo(story,currentStyle,currentVoice);
-    showResultMP4(story,currentStyle,currentVoice,blob);
+    saveVideo(story,currentStyle,selectedVoice);
+    showResultMP4(story,currentStyle,selectedVoice,blob);
   }catch(e){
     pEl.textContent = currentLang==='ar'? '⚠️ السيرفر مزحوم، دوس مرة أخرى' : '⚠️ Busy, tap again';
     await new Promise(r=>setTimeout(r,2000));
@@ -164,7 +172,7 @@ function showLibrary(){
   const list=document.getElementById('libList');
   vids.forEach(v=>{
     const row=document.createElement('div'); row.style.cssText="background:#1A1A1A;border:2px solid #8B5CF6;border-radius:16px;padding:12px;margin-bottom:14px";
-    row.innerHTML=`<div style="font-weight:700;margin-bottom:6px;font-size:14px">${v.story.substring(0,80)}...</div><div style="display:flex;justify-content:space-between;align-items:center"><span style="color:#FFC300;font-size:12px">${v.date}</span><button class="delBtn" style="background:#FF3B30;border:0;color:#fff;padding:6px 12px;border-radius:8px;font-weight:700"><i class="fas fa-trash"></i> ${t.delete}</button></div>`;
+    row.innerHTML=`<div style="font-weight:700;margin-bottom:6px;font-size:14px">${v.story.substring(0,80)}...</div><div style="display:flex;justify-content:space-between;align-items:center"><span style="color:#FFC300;font-size:12px">${v.date} - ${v.voice==='male'?'Hedi راجل':'Reem مرا'}</span><button class="delBtn" style="background:#FF3B30;border:0;color:#fff;padding:6px 12px;border-radius:8px;font-weight:700"><i class="fas fa-trash"></i> ${t.delete}</button></div>`;
     row.querySelector('.delBtn').onclick=()=>deleteVideo(v.id); list.appendChild(row);
   });
 }
