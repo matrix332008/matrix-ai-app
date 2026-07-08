@@ -2,6 +2,9 @@ let currentLang = 'ar';
 let currentStyle = 'drama';
 let currentVoice = 'female';
 
+// زيد هذا السطر برك
+const BACKEND_URL = "https://matrix-ai-app.onrender.com";
+
 function hashCode(s){let h=0;for(let i=0;i<s.length;i++)h=(h<<5)-h+s.charCodeAt(i);return Math.abs(h);}
 
 const translations = {
@@ -13,7 +16,7 @@ const translations = {
     backHome: 'رجوع للرئيسية',
     download: 'تحميل الفيديو MP4 📥',
     share: 'مشاركة TikTok / Facebook',
-    story: 'الحكاية:', style: 'الستايل:', voice: 'الصوت:', male: 'راجل', female: 'مرا',
+    story: 'الحكاية:', style: 'الستايل:', voice: 'الصوت:', male: 'راجل (Hedi التونسي)', female: 'مرا (Reem التونسية)',
     library: 'المكتبة', libraryEmpty: 'المكتبة فارغة', libraryDesc: 'الفيديوات اللي تولدهم باش يظهرو هنا',
     createNew: 'أنشئ فيديو جديد', videos: 'الفيديوات', plan: 'الخطة', free: 'مجاني',
     delete: 'حذف', copied: 'تم النسخ!', downloading: 'جاري توليد MP4...', loading: 'جاري تحميل الفيديو...', playing: 'قاعد يخدم ▶️'
@@ -43,25 +46,45 @@ function useTrend(i){
 
 let audioPlayer=null, finalVideoBlob=null;
 function stopAudio(){if(audioPlayer){try{audioPlayer.pause();}catch(e){}audioPlayer=null;}try{speechSynthesis.cancel();}catch(e){}}
+
+// *** هذا اللي تصلح - توا صوت تونسي حقيقي ***
 async function speakNatural(text){
   stopAudio();
   const clean=text.replace(/[\u064B-\u065F\u0670ـ]/g,'').replace(/\s+/g,' ').trim().substring(0,800);
   if(!clean) return;
   try{
-    const voiceName=currentLang==='ar'?(currentVoice==='female'?'Zeina':'Tarik'):(currentVoice==='female'?'Vlasta':'Jan');
-    const url=`https://api.streamelements.com/kappa/v2/speech?voice=${voiceName}&text=${encodeURIComponent(clean)}`;
-    const res=await fetch(url);
-    if(!res.ok) throw Error();
-    const blob=await res.blob();
-    const audio=new Audio(URL.createObjectURL(blob));
-    audioPlayer=audio;
-    await audio.play();
+    // نحاولو نجيبو صوت تونسي من الـ Backend الجديد
+    const res = await fetch(`${BACKEND_URL}/tts`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ text: clean, voice: currentVoice, lang: currentLang })
+    });
+    if(res.ok){
+      const blob = await res.blob();
+      const audio=new Audio(URL.createObjectURL(blob));
+      audioPlayer=audio;
+      await audio.play();
+      return;
+    }
+    throw new Error('backend fail');
   }catch(e){
-    const u=new SpeechSynthesisUtterance(clean);
-    u.lang=currentLang==='ar'?'ar-SA':'cs-CZ';u.rate=0.85;u.pitch=currentVoice==='female'?1.05:0.65;
-    const vs=speechSynthesis.getVoices();const ls=vs.filter(v=>v.lang.toLowerCase().startsWith(currentLang==='ar'?'ar':'cs'));
-    if(ls.length>0) u.voice=ls.find(v=>v.name.toLowerCase().includes('google'))||ls[0];
-    speechSynthesis.speak(u);
+    // كان الـ Backend طايح، نستعملو المؤقت السعودي
+    try{
+      const voiceName=currentLang==='ar'?(currentVoice==='female'?'Zeina':'Tarik'):(currentVoice==='female'?'Vlasta':'Jan');
+      const url=`https://api.streamelements.com/kappa/v2/speech?voice=${voiceName}&text=${encodeURIComponent(clean)}`;
+      const res2=await fetch(url);
+      if(!res2.ok) throw Error();
+      const blob=await res2.blob();
+      const audio=new Audio(URL.createObjectURL(blob));
+      audioPlayer=audio;
+      await audio.play();
+    }catch(e2){
+      const u=new SpeechSynthesisUtterance(clean);
+      u.lang=currentLang==='ar'?'ar-SA':'cs-CZ';u.rate=0.85;u.pitch=currentVoice==='female'?1.05:0.65;
+      const vs=speechSynthesis.getVoices();const ls=vs.filter(v=>v.lang.toLowerCase().startsWith(currentLang==='ar'?'ar':'cs'));
+      if(ls.length>0) u.voice=ls.find(v=>v.name.toLowerCase().includes('google'))||ls[0];
+      speechSynthesis.speak(u);
+    }
   }
 }
 
