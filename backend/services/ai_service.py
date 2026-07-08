@@ -7,38 +7,44 @@ class AIService:
     def __init__(self):
         self.tmp_dir = "/tmp"
         os.makedirs(self.tmp_dir, exist_ok=True)
-
-        # أصوات تونسية حقيقية مجانية
         self.voices = {
-            "female": "ar-TN-ReemNeural", # مرا تونسية حقيقية
-            "male": "ar-TN-HediNeural", # راجل تونسي حقيقي
+            "female": "ar-TN-ReemNeural",
+            "male": "ar-TN-HediNeural",
             "cs_female": "cs-CZ-VlastaNeural",
             "cs_male": "cs-CZ-AntoninNeural"
         }
 
     async def generate_script(self, prompt: str, language: str, style: str) -> str:
-        # توا نخليو النص هو بيدو، بعدين تربطو OpenAI اذا تحب
         if language == "ar":
             return f"{prompt}. هذه قصة {style} مشوقة تروي تفاصيل مثيرة..."
         else:
             return f"{prompt}. This is a {style} story full of drama..."
 
     async def generate_voice(self, text: str, voice_type: str, language: str) -> str:
-        # صوت تونسي حقيقي بـ edge-tts
-        voice_key = voice_type if language == "ar" else f"cs_{voice_type}"
-        voice_name = self.voices.get(voice_key, "ar-TN-ReemNeural")
+        # === تصليح صوت راجل/مرا ===
+        vt = str(voice_type).lower().strip()
+        print(f"🎤 طلب صوت: {voice_type} -> {vt}")
+
+        if vt in ["male", "m", "man", "hedi", "راجل", "رجل"]:
+            voice_name = "ar-TN-HediNeural"
+            vt_key = "male"
+        else:
+            voice_name = "ar-TN-ReemNeural"
+            vt_key = "female"
+
+        if language!= "ar":
+            voice_name = "cs-CZ-AntoninNeural" if vt_key == "male" else "cs-CZ-VlastaNeural"
+
+        print(f"✅ باش نستعمل: {voice_name}")
 
         file_id = str(uuid.uuid4())[:8]
         output_path = f"{self.tmp_dir}/{file_id}.mp3"
-
-        clean_text = text[:1000] # edge-tts يقبل حتى 1000 حرف
+        clean_text = text[:1000]
         communicate = edge_tts.Communicate(clean_text, voice_name)
         await communicate.save(output_path)
-
-        return output_path # نرجعو مسار الملف الحقيقي
+        return output_path
 
     async def generate_images(self, script: str, count: int = 3) -> List[str]:
-        # نستعملو Pollinations مجاني وحقيقي
         seed = abs(hash(script)) % 10000
         base = script[:60]
         urls = []
