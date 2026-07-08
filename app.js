@@ -11,7 +11,15 @@ const translations = {
     download: 'تحميل الفيديو',
     share: 'مشاركة',
     story: 'الحكاية:',
-    style: 'الستايل:'
+    style: 'الستايل:',
+    library: 'المكتبة',
+    libraryEmpty: 'المكتبة فارغة',
+    libraryDesc: 'الفيديوات اللي تولدهم باش يظهرو هنا',
+    createNew: 'أنشئ فيديو جديد',
+    videos: 'الفيديوات',
+    plan: 'الخطة',
+    free: 'مجاني',
+    delete: 'حذف'
   },
   cs: {
     alertEmpty: 'Nejprve napiš příběh',
@@ -22,29 +30,55 @@ const translations = {
     download: 'Stáhnout video',
     share: 'Sdílet',
     story: 'Příběh:',
-    style: 'Styl:'
+    style: 'Styl:',
+    library: 'Knihovna',
+    libraryEmpty: 'Knihovna je prázdná',
+    libraryDesc: 'Videa která vytvoříš se zobrazí zde',
+    createNew: 'Vytvořit nové video',
+    videos: 'Videa',
+    plan: 'Plán',
+    free: 'Zdarma',
+    delete: 'Smazat'
   }
 };
 
-// فيديوات Template مجانية 100% من Pixabay
+// فيديوات Template مجانية من Pixabay
 const videoTemplates = {
   drama: [
-    'https://cdn.pixabay.com/video/2024/02/20/201368-915375272_large.mp4', // مدينة ليل
-    'https://cdn.pixabay.com/video/2023/11/25/190774-888058023_large.mp4' // سماء ونجوم
+    'https://cdn.pixabay.com/video/2024/02/20/201368-915375272_large.mp4',
+    'https://cdn.pixabay.com/video/2023/11/25/190774-888058023_large.mp4'
   ],
   action: [
-    'https://cdn.pixabay.com/video/2022/11/22/140111-774507553_large.mp4', // نار وانفجار
-    'https://cdn.pixabay.com/video/2024/05/22/213027_large.mp4' // سيارات
+    'https://cdn.pixabay.com/video/2022/11/22/140111-774507553_large.mp4',
+    'https://cdn.pixabay.com/video/2024/05/22/213027_large.mp4'
   ],
   funny: [
-    'https://cdn.pixabay.com/video/2023/10/27/186899-878641412_large.mp4', // حيوانات
-    'https://cdn.pixabay.com/video/2022/07/24/125314-734046618_large.mp4' // غابة
+    'https://cdn.pixabay.com/video/2023/10/27/186899-878641412_large.mp4',
+    'https://cdn.pixabay.com/video/2022/07/24/125314-734046618_large.mp4'
   ],
   horror: [
-    'https://cdn.pixabay.com/video/2023/08/23/177636-857251527_large.mp4', // بحر مظلم
-    'https://cdn.pixabay.com/video/2020/07/30/46026-447087782_large.mp4' // غابة ضباب
+    'https://cdn.pixabay.com/video/2023/08/23/177636-857251527_large.mp4',
+    'https://cdn.pixabay.com/video/2020/07/30/46026-447087782_large.mp4'
   ]
 };
+
+// جلب الفيديوات المحفوظة
+function getSavedVideos() {
+  return JSON.parse(localStorage.getItem('matrix_videos') || '[]');
+}
+
+// حفظ فيديو جديد
+function saveVideo(story, style, videoUrl) {
+  const videos = getSavedVideos();
+  videos.unshift({
+    id: Date.now(),
+    story,
+    style,
+    videoUrl,
+    date: new Date().toLocaleDateString(currentLang === 'ar'? 'ar-TN' : 'cs-CZ')
+  });
+  localStorage.setItem('matrix_videos', JSON.stringify(videos));
+}
 
 // تبديل اللغة
 document.querySelectorAll('.lang button').forEach(btn => {
@@ -90,19 +124,20 @@ document.getElementById('generateBtn').onclick = async () => {
   btn.disabled = true;
   loader.classList.add('show');
   
-  // نختار فيديو حسب الستايل
   const templates = videoTemplates[currentStyle];
   const videoUrl = templates[Math.floor(Math.random() * templates.length)];
   
-  // محاكاة "توليد" - 2 ثواني
   await new Promise(r => setTimeout(r, 2000));
+  
+  // نحفظ الفيديو في المكتبة
+  saveVideo(story, currentStyle, videoUrl);
   
   btn.disabled = false;
   loader.classList.remove('show');
   showResult(story, currentStyle, videoUrl);
 };
 
-// عرض صفحة النتيجة مع فيديو حقيقي MP4
+// عرض صفحة النتيجة
 function showResult(story, style, videoUrl) {
   const t = translations[currentLang];
   const styleBtn = document.querySelector(`[data-style="${style}"]`);
@@ -148,14 +183,24 @@ function shareVideo(url) {
     });
   } else {
     navigator.clipboard.writeText(url);
-    alert('تم نسخ رابط الفيديو!');
+    alert(currentLang === 'ar'? 'تم نسخ رابط الفيديو!' : 'Odkaz zkopírován!');
   }
+}
+
+// حذف فيديو من المكتبة
+function deleteVideo(id) {
+  const videos = getSavedVideos().filter(v => v.id!== id);
+  localStorage.setItem('matrix_videos', JSON.stringify(videos));
+  showLibrary();
 }
 
 // Nav buttons
 document.querySelectorAll('nav a').forEach((btn, i) => {
   btn.onclick = (e) => {
     e.preventDefault();
+    document.querySelectorAll('nav a').forEach(a => a.classList.remove('on'));
+    btn.classList.add('on');
+    
     if(i === 0) location.reload();
     if(i === 1) alert(currentLang === 'ar'? 'قريباً...' : 'Brzy...');
     if(i === 2) location.reload();
@@ -164,18 +209,56 @@ document.querySelectorAll('nav a').forEach((btn, i) => {
   };
 });
 
+// عرض المكتبة مع الفيديوات المحفوظة
 function showLibrary() {
+  const t = translations[currentLang];
+  const videos = getSavedVideos();
+  
+  if(videos.length === 0) {
+    document.querySelector('.wrap').innerHTML = `
+      <div style="padding:40px 20px;text-align:center">
+        <i class="fas fa-folder-open" style="font-size:80px;color:#8B5CF6;margin-bottom:20px"></i>
+        <h2 style="font-size:28px;margin-bottom:16px">${t.libraryEmpty}</h2>
+        <p style="color:#888;margin-bottom:30px">${t.libraryDesc}</p>
+        <button onclick="location.reload()" class="big"><i class="fas fa-plus"></i> ${t.createNew}</button>
+      </div>
+    `;
+    return;
+  }
+  
   document.querySelector('.wrap').innerHTML = `
-    <div style="padding:40px 20px;text-align:center">
-      <i class="fas fa-folder-open" style="font-size:80px;color:#8B5CF6;margin-bottom:20px"></i>
-      <h2 style="font-size:28px;margin-bottom:16px" data-ar="المكتبة فارغة" data-cs="Knihovna je prázdná">${currentLang === 'ar'? 'المكتبة فارغة' : 'Knihovna je prázdná'}</h2>
-      <p style="color:#888;margin-bottom:30px" data-ar="الفيديوات اللي تولدهم باش يظهرو هنا" data-cs="Videa která vytvoříš se zobrazí zde">${currentLang === 'ar'? 'الفيديوات اللي تولدهم باش يظهرو هنا' : 'Videa která vytvoříš se zobrazí zde'}</p>
-      <button onclick="location.reload()" class="big"><i class="fas fa-plus"></i> ${currentLang === 'ar'? 'أنشئ فيديو جديد' : 'Vytvořit nové video'}</button>
+    <div style="padding:20px">
+      <h2 style="text-align:center;font-size:28px;margin-bottom:20px;font-weight:900">${t.library}</h2>
+      ${videos.map(v => {
+        const styleName = document.querySelector(`[data-style="${v.style}"]`).dataset[currentLang];
+        return `
+        <div style="background:#1A1A1A;border:2px solid #8B5CF6;border-radius:16px;padding:12px;margin-bottom:14px">
+          <video style="width:100%;border-radius:12px;margin-bottom:12px" controls>
+            <source src="${v.videoUrl}" type="video/mp4">
+          </video>
+          <div style="font-weight:700;margin-bottom:6px;font-size:15px">${v.story}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <span style="color:#FFC300;font-size:13px;font-weight:700">${styleName}</span>
+              <span style="color:#666;font-size:12px;margin:0 8px">•</span>
+              <span style="color:#888;font-size:12px">${v.date}</span>
+            </div>
+            <button onclick="deleteVideo(${v.id})" style="background:#FF3B30;border:0;color:#fff;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700">
+              <i class="fas fa-trash"></i> ${t.delete}
+            </button>
+          </div>
+        </div>
+        `;
+      }).join('')}
     </div>
   `;
 }
 
+// عرض البروفايل
 function showProfile() {
+  const t = translations[currentLang];
+  const videoCount = getSavedVideos().length;
+  
   document.querySelector('.wrap').innerHTML = `
     <div style="padding:40px 20px;text-align:center">
       <i class="fas fa-user-circle" style="font-size:100px;color:#FFC300;margin-bottom:20px"></i>
@@ -183,16 +266,16 @@ function showProfile() {
       <p style="color:#888;margin-bottom:30px">user@matrix.ai</p>
       <div style="background:#1A1A1A;border-radius:18px;padding:20px;text-align:right">
         <div style="display:flex;justify-content:space-between;margin-bottom:16px">
-          <span style="color:#888">${currentLang === 'ar'? 'الفيديوات' : 'Videa'}</span>
-          <span style="font-weight:800;color:#FFC300">0</span>
+          <span style="color:#888">${t.videos}</span>
+          <span style="font-weight:800;color:#FFC300">${videoCount}</span>
         </div>
         <div style="display:flex;justify-content:space-between">
-          <span style="color:#888">${currentLang === 'ar'? 'الخطة' : 'Plán'}</span>
-          <span style="font-weight:800;color:#8B5CF6">${currentLang === 'ar'? 'مجاني' : 'Zdarma'}</span>
+          <span style="color:#888">${t.plan}</span>
+          <span style="font-weight:800;color:#8B5CF6">${t.free}</span>
         </div>
       </div>
       <button onclick="location.reload()" class="btn" style="width:100%;margin-top:30px;height:58px">
-        <i class="fas fa-home"></i> ${currentLang === 'ar'? 'رجوع للرئيسية' : 'Zpět domů'}
+        <i class="fas fa-home"></i> ${t.backHome}
       </button>
     </div>
   `;
