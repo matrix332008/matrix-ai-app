@@ -23,7 +23,6 @@ async def generate_video(request: VideoRequest):
 
     final_video_path = await video_merger.create_video(image_urls, audio_path, f"matrix_{video_id}")
 
-    # نرجعو الفيديو مباشرة
     if os.path.exists(final_video_path) and final_video_path.endswith(".mp4"):
         return FileResponse(final_video_path, media_type="video/mp4", filename=f"matrix_{video_id}.mp4")
     else:
@@ -34,3 +33,12 @@ async def generate_video(request: VideoRequest):
             "images": image_urls,
             "video_path": final_video_path
         }
+
+# *** زيد هذا باش الـ frontend القديم يجيب صوت تونسي ***
+@router.post("/tts")
+async def tts_endpoint(data: dict):
+    text = data.get("text","")
+    voice = data.get("voice","female")
+    lang = data.get("lang","ar")
+    audio_path = await ai_service.generate_voice(text, voice, lang)
+    return FileResponse(audio_path, media_type="audio/mpeg", filename="voice.mp3")
