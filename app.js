@@ -2,6 +2,8 @@ let currentLang = 'ar';
 let currentStyle = 'drama';
 let currentVoice = 'female';
 
+function hashCode(s){let h=0;for(let i=0;i<s.length;i++)h=(h<<5)-h+s.charCodeAt(i);return Math.abs(h);}
+
 const translations = {
   ar: {
     alertEmpty: 'اكتب الحكاية الأول يا معلم',
@@ -9,31 +11,29 @@ const translations = {
     generating: 'جاري توليد فيديو AI حقيقي من قصتك...',
     resultTitle: 'الفيديو الحقيقي جاهز!',
     backHome: 'رجوع للرئيسية',
-    download: 'تحميل الفيديو 📥',
+    download: 'تحميل الفيديو MP4 📥',
     share: 'مشاركة TikTok / Facebook',
     story: 'الحكاية:', style: 'الستايل:', voice: 'الصوت:', male: 'راجل', female: 'مرا',
     library: 'المكتبة', libraryEmpty: 'المكتبة فارغة', libraryDesc: 'الفيديوات اللي تولدهم باش يظهرو هنا',
     createNew: 'أنشئ فيديو جديد', videos: 'الفيديوات', plan: 'الخطة', free: 'مجاني',
-    delete: 'حذف', copied: 'تم النسخ!', downloading: 'جاري التحميل...', loading: 'جاري تحميل الفيديو...', playing: 'قاعد يخدم ▶️'
+    delete: 'حذف', copied: 'تم النسخ!', downloading: 'جاري توليد MP4...', loading: 'جاري تحميل الفيديو...', playing: 'قاعد يخدم ▶️'
   },
   cs: {
     alertEmpty: 'Nejprve napiš příběh', alertDone: 'Video hotové! 🎉',
     generating: 'Generuji AI video...', resultTitle: 'AI video je hotové!',
-    backHome: 'Zpět domů', download: 'Stáhnout video 📥', share: 'Sdílet TikTok / Facebook',
+    backHome: 'Zpět domů', download: 'Stáhnout video MP4 📥', share: 'Sdílet TikTok / Facebook',
     story: 'Příběh:', style: 'Styl:', voice: 'Hlas:', male: 'Muž', female: 'Žena',
     library: 'Knihovna', libraryEmpty: 'Knihovna prázdná', libraryDesc: 'Videa zde',
     createNew: 'Vytvořit video', videos: 'Videa', plan: 'Plán', free: 'Zdarma',
-    delete: 'Smazat', copied: 'Zkopírováno!', downloading: 'Stahuji...', loading: 'Načítám video...', playing: 'Přehrávám ▶️'
+    delete: 'Smazat', copied: 'Zkopírováno!', downloading: 'Generuji MP4...', loading: 'Načítám video...', playing: 'Přehrávám ▶️'
   }
 };
 
-// قصص الترند الجديدة
 const trendStories = [
   "في تونس القديمة، كان هناك ساحر يحمي المدينة بقوة غامضة، حتى جاء يوم ظهر فيه تنين أسود يهدد الجميع...",
   "في سنة 3024، وقع رجل آلي في حب فتاة بشرية، قصة حب مستحيلة لكن القلب لا يعرف المستحيل، حاربا العالم لأجل حبهما...",
   "دار مهجورة في قرية بعيدة، كل من دخلها سمع أصوات أطفال يضحكون في الليل، حتى جاء شاب قرر كشف السر..."
 ];
-
 function useTrend(i){
   document.getElementById('storyInput').value = trendStories[i];
   document.querySelectorAll('.style-btn')[i===2?3:i===1?2:0].click();
@@ -41,37 +41,34 @@ function useTrend(i){
   document.getElementById('storyInput').focus();
 }
 
-let voices = [];
-function loadVoices(){ voices = speechSynthesis.getVoices(); }
-loadVoices();
-if(speechSynthesis.onvoiceschanged!== undefined) speechSynthesis.onvoiceschanged = loadVoices;
-
-function cleanArabicText(t){ return t.replace(/[\u064B-\u065F\u0670]/g,'').replace(/[ـ]/g,'').replace(/\s+/g,' ').trim(); }
-function speak(text){
-  speechSynthesis.cancel();
-  const clean = currentLang==='ar'? cleanArabicText(text) : text;
-  const u = new SpeechSynthesisUtterance(clean);
-  u.lang = currentLang==='ar'? 'ar-SA' : 'cs-CZ';
-  u.rate = currentLang==='ar'? 0.82 : 0.88;
-  u.pitch = currentVoice==='female'? 1.0 : 0.82;
-  u.volume = 1;
-  const arV = voices.filter(v=>v.lang.toLowerCase().startsWith('ar'));
-  const csV = voices.filter(v=>v.lang.toLowerCase().startsWith('cs'));
-  const list = currentLang==='ar'? arV : csV;
-  if(list.length>0){
-    let best = list.find(v=>v.name.toLowerCase().includes('google')) || list[0];
-    if(currentVoice==='male') best = list.find(v=>v.name.toLowerCase().includes('male')||v.name.includes('Maged')) || best;
-    u.voice = best;
+let audioPlayer=null, finalVideoBlob=null;
+function stopAudio(){if(audioPlayer){try{audioPlayer.pause();}catch(e){}audioPlayer=null;}try{speechSynthesis.cancel();}catch(e){}}
+async function speakNatural(text){
+  stopAudio();
+  const clean=text.replace(/[\u064B-\u065F\u0670ـ]/g,'').replace(/\s+/g,' ').trim().substring(0,800);
+  if(!clean) return;
+  try{
+    const voiceName=currentLang==='ar'?(currentVoice==='female'?'Zeina':'Tarik'):(currentVoice==='female'?'Vlasta':'Jan');
+    const url=`https://api.streamelements.com/kappa/v2/speech?voice=${voiceName}&text=${encodeURIComponent(clean)}`;
+    const res=await fetch(url);
+    if(!res.ok) throw Error();
+    const blob=await res.blob();
+    const audio=new Audio(URL.createObjectURL(blob));
+    audioPlayer=audio;
+    await audio.play();
+  }catch(e){
+    const u=new SpeechSynthesisUtterance(clean);
+    u.lang=currentLang==='ar'?'ar-SA':'cs-CZ';u.rate=0.85;u.pitch=currentVoice==='female'?1.05:0.65;
+    const vs=speechSynthesis.getVoices();const ls=vs.filter(v=>v.lang.toLowerCase().startsWith(currentLang==='ar'?'ar':'cs'));
+    if(ls.length>0) u.voice=ls.find(v=>v.name.toLowerCase().includes('google'))||ls[0];
+    speechSynthesis.speak(u);
   }
-  speechSynthesis.speak(u);
 }
 
 function getSavedVideos(){ return JSON.parse(localStorage.getItem('matrix_videos')||'[]'); }
 function saveVideo(s,st,im,vc){ const a=getSavedVideos(); a.unshift({id:Date.now(),story:s,style:st,images:im,voice:vc,date:new Date().toLocaleDateString(currentLang==='ar'?'ar-TN':'cs-CZ')}); localStorage.setItem('matrix_videos',JSON.stringify(a)); }
 function deleteVideo(id){ localStorage.setItem('matrix_videos', JSON.stringify(getSavedVideos().filter(x=>x.id!==id))); showLibrary(); }
-async function downloadImage(url, filename){
-  try{ const r=await fetch(url); const b=await r.blob(); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=filename; document.body.appendChild(a); a.click(); document.body.removeChild(a); }catch{ window.open(url,'_blank'); }
-}
+async function downloadBlob(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);}
 
 document.querySelectorAll('.lang button').forEach(btn=>{
   btn.onclick=()=>{
@@ -96,10 +93,10 @@ document.getElementById('generateBtn').onclick = async ()=>{
   btn.disabled=true; loader.classList.add('show');
   try{
     pEl.textContent=`10% - ${currentLang==='ar'?'نحلل القصة...':'Analyzuji...'}`;
-    const s1=story.substring(0,Math.floor(story.length/3)).substring(0,80);
-    const s2=story.substring(Math.floor(story.length/3),Math.floor(story.length*2/3)).substring(0,80);
-    const s3=story.substring(Math.floor(story.length*2/3)).substring(0,80);
-    const seed=Date.now();
+    const s1=story.substring(0,Math.floor(story.length/3)).substring(0,70);
+    const s2=story.substring(Math.floor(story.length/3),Math.floor(story.length*2/3)).substring(0,70);
+    const s3=story.substring(Math.floor(story.length*2/3)).substring(0,70);
+    const seed=hashCode(story+currentStyle);
     const urls=[
       `https://image.pollinations.ai/prompt/${encodeURIComponent(`cinematic ${currentStyle} movie, ${s1}, ultra realistic`)}?width=1024&height=576&seed=${seed}&nologo=true`,
       `https://image.pollinations.ai/prompt/${encodeURIComponent(`cinematic ${currentStyle} movie, ${s2}, dramatic`)}?width=1024&height=576&seed=${seed+1}&nologo=true`,
@@ -108,10 +105,10 @@ document.getElementById('generateBtn').onclick = async ()=>{
     const images=[];
     for(let i=0;i<urls.length;i++){
       pEl.textContent=`${30+i*25}% - ${currentLang==='ar'?`جاري تحميل الفيديو ${i+1}/3...`:`Načítám ${i+1}/3...`}`;
-      await new Promise(res=>{ const im=new Image(); im.onload=()=>{images.push(urls[i]);res();}; im.onerror=()=>{images.push(urls[i]);res();}; im.src=urls[i]; });
+      await new Promise(res=>{ const im=new Image(); im.crossOrigin='anonymous'; im.onload=()=>{images.push(urls[i]);res();}; im.onerror=()=>{images.push(urls[i]);res();}; im.src=urls[i]; });
     }
     pEl.textContent=`100% - ${currentLang==='ar'?'تم! ✅':'Hotovo! ✅'}`;
-    await new Promise(r=>setTimeout(r,500));
+    await new Promise(r=>setTimeout(r,400));
     saveVideo(story,currentStyle,images,currentVoice);
     showResult(story,currentStyle,images,currentVoice);
   }finally{ btn.disabled=false; loader.classList.remove('show'); pEl.textContent=oldText; }
@@ -121,16 +118,17 @@ function showResult(story,style,images,voice){
   const t=translations[currentLang];
   const styleName=document.querySelector(`[data-style="${style}"] span[data-ar]`)?.dataset[currentLang]||style;
   const voiceName=t[voice];
+  finalVideoBlob=null;
   document.querySelector('.wrap').innerHTML=`
     <div style="padding:20px">
       <h2 style="text-align:center;font-size:26px;margin-bottom:16px;font-weight:900">${t.resultTitle}</h2>
       <div style="position:relative;width:100%;border-radius:18px;border:2px solid #8B5CF6;overflow:hidden;background:#000;margin-bottom:16px;aspect-ratio:16/9">
-        <img id="mainAIImg" src="${images[0]}" style="width:100%;height:100%;object-fit:cover;display:block">
+        <canvas id="videoCanvas" width="1024" height="576" style="width:100%;height:100%;display:block"></canvas>
         <button id="playBtn" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80px;height:80px;border-radius:50%;background:rgba(255,195,0,0.95);border:0;color:#000;font-size:32px;display:grid;place-items:center;cursor:pointer"><i class="fas fa-play"></i></button>
+        <div id="recBadge" style="display:none;position:absolute;top:10px;left:10px;background:#FF3B30;color:#fff;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:800">● REC MP4</div>
         <div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:6px;background:rgba(0,0,0,0.6);padding:6px 10px;border-radius:20px">
           <span id="dot0" style="width:8px;height:8px;border-radius:50%;background:#FFC300"></span><span id="dot1" style="width:8px;height:8px;border-radius:50%;background:#555"></span><span id="dot2" style="width:8px;height:8px;border-radius:50%;background:#555"></span>
         </div>
-      </div>
       <div style="background:#1A1A1A;border:2px solid #8B5CF6;border-radius:18px;padding:16px;margin-bottom:14px">
         <div style="color:#888;font-size:12px">${t.story}</div><div style="font-size:14px;font-weight:700;line-height:1.7;margin-bottom:10px;max-height:250px;overflow:auto">${story}</div>
         <div style="color:#888;font-size:12px">${t.style}</div><div style="font-size:14px;font-weight:700;color:#FFC300;margin-bottom:8px">${styleName}</div>
@@ -139,17 +137,48 @@ function showResult(story,style,images,voice){
       <button id="downloadBtn" class="big"><i class="fas fa-download"></i> ${t.download}</button>
       <button id="shareBtn" class="btn" style="width:100%;margin-top:10px;height:58px"><i class="fas fa-share-alt"></i> ${t.share}</button>
       <button onclick="location.reload()" class="btn" style="width:100%;margin-top:10px;height:58px;border-color:#666;color:#888"><i class="fas fa-home"></i> ${t.backHome}</button>
+      <video id="finalVideo" controls playsinline style="display:none;width:100%;margin-top:14px;border-radius:16px;border:2px solid #FFC300"></video>
     </div>
   `;
-  let cur=0, playing=false, interval, mainImg=document.getElementById('mainAIImg'), playBtn=document.getElementById('playBtn');
-  function start(){ playing=true; playBtn.innerHTML='<i class="fas fa-pause"></i>'; speak(story); interval=setInterval(()=>{ cur=(cur+1)%images.length; mainImg.src=images[cur]; [0,1,2].forEach(i=>{ const d=document.getElementById('dot'+i); if(d) d.style.background=i===cur?'#FFC300':'#555'; }); },3000); }
-  function stop(){ playing=false; playBtn.innerHTML='<i class="fas fa-play"></i>'; clearInterval(interval); speechSynthesis.cancel(); }
+
+  const canvas=document.getElementById('videoCanvas'),ctx=canvas.getContext('2d');
+  const playBtn=document.getElementById('playBtn'),recBadge=document.getElementById('recBadge'),finalVideo=document.getElementById('finalVideo');
+  let cur=0,playing=false,interval,mediaRecorder,recordedChunks=[];
+  const loadedImgs=[];
+  (async()=>{for(let u of images){const im=new Image();im.crossOrigin='anonymous';im.src=u;await new Promise(r=>{im.onload=r;im.onerror=r;});loadedImgs.push(im);}if(loadedImgs[0])ctx.drawImage(loadedImgs[0],0,0,1024,576);})();
+
+  function startRec(){
+    const stream=canvas.captureStream(30);
+    recordedChunks=[];finalVideoBlob=null;
+    mediaRecorder=new MediaRecorder(stream,{mimeType:'video/webm;codecs=vp9'});
+    mediaRecorder.ondataavailable=e=>{if(e.data.size>0) recordedChunks.push(e.data);};
+    mediaRecorder.onstop=()=>{
+      const blob=new Blob(recordedChunks,{type:'video/webm'});
+      finalVideoBlob=blob;
+      finalVideo.src=URL.createObjectURL(blob);
+      finalVideo.style.display='block';
+      recBadge.style.display='none';
+    };
+    mediaRecorder.start();recBadge.style.display='block';
+  }
+
+  async function start(){if(playing) return;playing=true;playBtn.innerHTML='<i class="fas fa-pause"></i>';startRec();speakNatural(story);interval=setInterval(()=>{cur=(cur+1)%loadedImgs.length;if(loadedImgs[cur])ctx.drawImage(loadedImgs[cur],0,0,1024,576);[0,1,2].forEach(i=>{const d=document.getElementById('dot'+i);if(d) d.style.background=i===cur?'#FFC300':'#555';});},3000);}
+  function stop(){playing=false;playBtn.innerHTML='<i class="fas fa-play"></i>';clearInterval(interval);stopAudio();if(mediaRecorder&&mediaRecorder.state!=='inactive')mediaRecorder.stop();}
   playBtn.onclick=()=>playing?stop():start();
+
   document.getElementById('downloadBtn').onclick=async()=>{
-    const b=document.getElementById('downloadBtn'); b.innerHTML=`<i class="fas fa-spinner fa-spin"></i> ${t.downloading}`;
-    for(let i=0;i<images.length;i++) await downloadImage(images[i], `matrix-video-${i+1}.jpg`);
-    b.innerHTML=`<i class="fas fa-check"></i> ${currentLang==='ar'?'تم التحميل!':'Staženo!'}`; setTimeout(()=>b.innerHTML=`<i class="fas fa-download"></i> ${t.download}`,2000);
+    const b=document.getElementById('downloadBtn');
+    if(finalVideoBlob){
+      b.innerHTML=`<i class="fas fa-check"></i> ${currentLang==='ar'?'تم التحميل MP4!':'Staženo MP4!'}`;
+      await downloadBlob(finalVideoBlob,`matrix-${hashCode(story)}.webm`);
+      setTimeout(()=>b.innerHTML=`<i class="fas fa-download"></i> ${t.download}`,2000);
+    }else{
+      b.innerHTML=`<i class="fas fa-spinner fa-spin"></i> ${t.downloading}`;
+      await start();
+      setTimeout(async()=>{stop();if(finalVideoBlob) await downloadBlob(finalVideoBlob,`matrix-${hashCode(story)}.webm`);b.innerHTML=`<i class="fas fa-download"></i> ${t.download}`;},6000);
+    }
   };
+
   document.getElementById('shareBtn').onclick=()=>{
     const url=images[0]; const text=`شوف الفيديو اللي عملتو بـ Matrix AI 🔥`;
     if(navigator.share && navigator.canShare({title:'Matrix AI', text:text, url:url})){ navigator.share({title:'Matrix AI Video', text:text, url:url}); }
