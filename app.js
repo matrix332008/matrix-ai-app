@@ -70,41 +70,30 @@ document.querySelectorAll('.voice-btn').forEach(btn=>{
 document.getElementById('generateBtn').onclick = async ()=>{
   const story = document.getElementById('storyInput').value.trim();
   if(!story) return alert(translations[currentLang].alertEmpty);
-
   const btn = document.getElementById('generateBtn');
   const loader = document.getElementById('loader');
   const pEl = loader.querySelector('p');
   const selectedVoice = currentVoice;
   const selectedStyle = currentStyle;
-
-  btn.disabled=true;
-  loader.classList.add('show');
+  btn.disabled=true; loader.classList.add('show');
   pEl.textContent = selectedVoice==='male'? translations[currentLang].generating_male : translations[currentLang].generating_female;
-
   try{
     const canvas = document.createElement('canvas');
     canvas.width=720; canvas.height=1280;
     const ctx = canvas.getContext('2d');
     const stream = canvas.captureStream(30);
-
-    // === إصلاح لكل الأجهزة ===
     let mimeType = '';
     if(MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) mimeType='video/webm;codecs=vp9';
     else if(MediaRecorder.isTypeSupported('video/webm')) mimeType='video/webm';
     else if(MediaRecorder.isTypeSupported('video/mp4')) mimeType='video/mp4';
-
     let recorder;
-    try{
-      recorder = new MediaRecorder(stream, mimeType? {mimeType} : undefined);
-    }catch(e){
-      // iPhone قديم - نوري فيديو حي
-      pEl.textContent='✅ يخدم!';
+    try{ recorder = new MediaRecorder(stream, mimeType? {mimeType} : undefined); }
+    catch(e){
       showLiveCanvas(story, selectedStyle, selectedVoice, canvas);
       speakVoice(story, selectedVoice);
       btn.disabled=false; loader.classList.remove('show');
       return;
     }
-
     let chunks=[];
     recorder.ondataavailable=e=>{ if(e.data.size>0) chunks.push(e.data); };
     recorder.onstop = ()=>{
@@ -113,24 +102,18 @@ document.getElementById('generateBtn').onclick = async ()=>{
       showResult(story, selectedStyle, selectedVoice, finalVideoBlob);
       speakVoice(story, selectedVoice);
     };
-
     function speakVoice(txt, v){
       try{
         speechSynthesis.cancel();
         const utter = new SpeechSynthesisUtterance(txt.substring(0,300));
-        utter.lang = 'ar-SA';
-        utter.rate = 0.95;
-        utter.pitch = v==='male'? 0.7 : 1.3;
+        utter.lang = 'ar-SA'; utter.rate = 0.95; utter.pitch = v==='male'? 0.7 : 1.3;
         speechSynthesis.speak(utter);
       }catch(e){}
     }
-
     recorder.start(100);
-
     let frame=0;
     const bgColors = {drama:['#1a0033','#4a0080'], action:['#330000','#cc0000'], funny:['#332200','#ffaa00'], horror:['#001100','#003300']};
     const colors = bgColors[selectedStyle] || bgColors.drama;
-
     const draw = setInterval(()=>{
       const grad = ctx.createLinearGradient(0,0,0,1280);
       grad.addColorStop(0, colors[0]); grad.addColorStop(1, colors[1]);
@@ -145,9 +128,7 @@ document.getElementById('generateBtn').onclick = async ()=>{
       ctx.beginPath(); ctx.arc(360, 1000+Math.sin(frame/15)*20, 30, 0, Math.PI*2); ctx.fill();
       frame++;
     }, 33);
-
     setTimeout(()=>{ clearInterval(draw); recorder.stop(); }, 7000);
-
   }catch(e){
     console.error(e);
     pEl.textContent='صار خطأ، عاود جرب';
@@ -194,14 +175,39 @@ function showLiveCanvas(story, style, voice, canvas){
       <h2 style="text-align:center">الفيديو يخدم! 🔊</h2>
       <div id="canvasContainer"></div>
       <p style="text-align:center;color:#FFC300;margin-top:10px">🔊 الصوت قاعد يخدم</p>
-      <button onclick="location.reload()" class="big" style="margin-top:15px">حكاية جديدة</button>
+      <button onclick="location.reload()" class="big" style="margin-top:15px">🏠 رجوع للرئيسية</button>
     </div>
   `;
   document.getElementById('canvasContainer').appendChild(canvas);
 }
 
+// === هذا الجزء كان ناقص - رجعتلك المكتبة ===
 document.querySelectorAll('nav a').forEach((btn,i)=>{
-  btn.onclick=(e)=>{ e.preventDefault(); speechSynthesis.cancel(); if(i===0||i===2) location.reload(); };
+  btn.onclick=(e)=>{
+    e.preventDefault();
+    speechSynthesis.cancel();
+    document.querySelectorAll('nav a').forEach(a=>a.classList.remove('on'));
+    btn.classList.add('on');
+    if(i===0||i===2){
+      location.reload();
+    }else if(i===1){
+      alert('اكتشاف - قريباً...');
+    }else if(i===3){
+      const vids=getSavedVideos();
+      if(vids.length===0){
+        document.querySelector('.wrap').innerHTML=`<div style="padding:40px;text-align:center"><div style="font-size:60px">📁</div><h2>المكتبة فارغة</h2><p style="color:#888">الفيديوات اللي تولدهم باش يظهرو هنا</p><button onclick="location.reload()" class="big" style="margin-top:20px">+ أنشئ فيديو جديد</button></div>`;
+      }else{
+        let h=`<div style="padding:20px"><h2 style="text-align:center">📚 المكتبة - ${vids.length} فيديو</h2>`;
+        vids.forEach(v=>{
+          h+=`<div style="background:#1A1A1A;border:1px solid #8B5CF6;border-radius:12px;padding:12px;margin:10px 0"><div style="font-weight:700">${v.story.substring(0,70)}...</div><div style="color:#FFC300;font-size:12px;margin-top:4px">${v.date} - ${v.voice==='male'?'Hedi راجل':'Reem مرا'} - ${v.style}</div></div>`;
+        });
+        h+=`<button onclick="location.reload()" class="big">🏠 رجوع للرئيسية</button></div>`;
+        document.querySelector('.wrap').innerHTML=h;
+      }
+    }else if(i===4){
+      document.querySelector('.wrap').innerHTML=`<div style="padding:40px;text-align:center"><div style="font-size:80px">👤</div><h2>Matrix User</h2><p style="color:#888">${getSavedVideos().length} فيديو</p><button onclick="location.reload()" class="big" style="margin-top:20px">🏠 رجوع</button></div>`;
+    }
+  };
 });
 
 if('serviceWorker' in navigator){ navigator.serviceWorker.getRegistrations().then(r=>r.forEach(x=>x.unregister())); }
