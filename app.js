@@ -8,8 +8,9 @@ function hashCode(s){let h=0;for(let i=0;i<s.length;i++)h=(h<<5)-h+s.charCodeAt(
 const translations = {
   ar: {
     alertEmpty: 'اكتب الحكاية الأول يا معلم',
-    alertDone: 'تم توليد فيديو MP4 حقيقي بصوت تونسي! 🎉',
-    generating: 'قاعد نولد فيديو MP4 حقيقي بصوت Reem التونسية... 40 ثانية',
+    alertDone: 'تم توليد فيديو MP4 بصوت تونسي! 🎉',
+    generating: '🚀 نسخنو في الموتور التونسي...',
+    generating2: 'قاعد نولد فيديو MP4 بصوت Reem...',
     resultTitle: 'الفيديو التونسي MP4 جاهز!',
     backHome: 'رجوع للرئيسية',
     download: 'تحميل الفيديو MP4 📥',
@@ -21,7 +22,8 @@ const translations = {
   },
   cs: {
     alertEmpty: 'Nejprve napiš příběh', alertDone: 'Video hotové! 🎉',
-    generating: 'Generuji MP4 video...', resultTitle: 'MP4 video je hotové!',
+    generating: '🚀 Startuji motor...', generating2: 'Generuji MP4 video...',
+    resultTitle: 'MP4 video je hotové!',
     backHome: 'Zpět domů', download: 'Stáhnout MP4 📥', share: 'Sdílet TikTok / Facebook',
     story: 'Příběh:', style: 'Styl:', voice: 'Hlas:', male: 'Muž', female: 'Žena',
     library: 'Knihovna', libraryEmpty: 'Knihovna prázdná', libraryDesc: 'Videa zde',
@@ -64,29 +66,53 @@ document.querySelectorAll('.lang button').forEach(btn=>{
 document.querySelectorAll('.style-btn').forEach(btn=>{ btn.onclick=()=>{ document.querySelectorAll('.style-btn').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); currentStyle=btn.dataset.style; }; });
 document.querySelectorAll('.voice-btn').forEach(btn=>{ btn.onclick=()=>{ document.querySelectorAll('.voice-btn').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); currentVoice=btn.dataset.voice; }; });
 
-// *** الجديد: يولد MP4 حقيقي من الـ Backend ***
+// *** مصلح: يفيق السيرفر اوتوماتيك بدون Error ***
 document.getElementById('generateBtn').onclick = async ()=>{
   const story=document.getElementById('storyInput').value.trim();
   if(!story) return alert(translations[currentLang].alertEmpty);
   const btn=document.getElementById('generateBtn'), loader=document.getElementById('loader');
   const pEl=loader.querySelector('p'); const oldText=pEl.textContent;
   btn.disabled=true; loader.classList.add('show');
-  pEl.textContent = translations[currentLang].generating;
+
+  async function generateWithRetry(){
+    // محاولة 1
+    try{
+      pEl.textContent = translations[currentLang].generating;
+      await fetch(`${BACKEND_URL}/health`).catch(()=>{}); // ping خفيف
+      await new Promise(r=>setTimeout(r,3000));
+      pEl.textContent = translations[currentLang].generating2;
+      const res = await fetch(`${BACKEND_URL}/video/generate`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({prompt: story, language: currentLang, style: currentStyle, voice: currentVoice})
+      });
+      if(res.ok) return await res.blob();
+      throw new Error();
+    }catch(e){
+      // محاولة 2 اوتوماتيك بعد 15 ثانية - بدون alert
+      pEl.textContent = currentLang==='ar'? '⏳ الموتور قاعد يسخن... 15 ثانية برك' : '⏳ Warming up... 15s';
+      await new Promise(r=>setTimeout(r,15000));
+      const res2 = await fetch(`${BACKEND_URL}/video/generate`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({prompt: story, language: currentLang, style: currentStyle, voice: currentVoice})
+      });
+      if(res2.ok) return await res2.blob();
+      throw new Error();
+    }
+  }
+
   try{
-    const res = await fetch(`${BACKEND_URL}/video/generate`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({prompt: story, language: currentLang, style: currentStyle, voice: currentVoice})
-    });
-    if(!res.ok) throw new Error(await res.text());
-    const blob = await res.blob();
+    const blob = await generateWithRetry();
     finalVideoBlob = blob;
     saveVideo(story,currentStyle,currentVoice);
     showResultMP4(story,currentStyle,currentVoice,blob);
   }catch(e){
-    alert(currentLang==='ar'?'السيرفر يصحى (Render) استنى 40 ثانية وجرب مرة أخرى':'Server waking up, wait 40s and try again');
-    console.error(e);
-  }finally{ btn.disabled=false; loader.classList.remove('show'); pEl.textContent=oldText; }
+    pEl.textContent = currentLang==='ar'? '⚠️ السيرفر مزحوم، دوس مرة أخرى' : '⚠️ Busy, tap again';
+    await new Promise(r=>setTimeout(r,2000));
+  }finally{
+    btn.disabled=false; loader.classList.remove('show'); pEl.textContent=oldText;
+  }
 };
 
 function showResultMP4(story,style,voice,blob){
@@ -112,7 +138,7 @@ function showResultMP4(story,style,voice,blob){
   };
 }
 
-function showResult(story,style,images,voice){ // للـ Library القديمة
+function showResult(story,style,images,voice){
   const t=translations[currentLang];
   const styleName=document.querySelector(`[data-style="${style}"] span[data-ar]`)?.dataset[currentLang]||style;
   document.querySelector('.wrap').innerHTML=`
@@ -146,5 +172,4 @@ function showProfile(){
   const t=translations[currentLang];
   document.querySelector('.wrap').innerHTML=`<div style="padding:40px 20px;text-align:center"><i class="fas fa-user-circle" style="font-size:100px;color:#FFC300;margin-bottom:20px"></i><h2 style="font-size:28px;margin-bottom:8px">Matrix User</h2><p style="color:#888;margin-bottom:30px">user@matrix.ai</p><div style="background:#1A1A1A;border-radius:18px;padding:20px;text-align:right"><div style="display:flex;justify-content:space-between;margin-bottom:16px"><span style="color:#888">${t.videos}</span><span style="font-weight:800;color:#FFC300">${getSavedVideos().length}</span></div><div style="display:flex;justify-content:space-between"><span style="color:#888">${t.plan}</span><span style="font-weight:800;color:#8B5CF6">${t.free}</span></div></div><button onclick="location.reload()" class="btn" style="width:100%;margin-top:30px;height:58px"><i class="fas fa-home"></i> ${t.backHome}</button></div>`;
 }
-// حيد الـ Service Worker باش ما يبقاش كاش قديم
 if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(r=>r.forEach(x=>x.unregister()));}
