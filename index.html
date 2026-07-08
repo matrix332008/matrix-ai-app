@@ -3,8 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0D0D0D">
 <title>Matrix AI</title>
 <link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&family=Outfit:wght@800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <style>
@@ -111,11 +113,11 @@ nav a i{font-size:24px}
     </div>
   </div>
   <nav>
-    <a class="on"><i class="fas fa-home"></i><span data-ar="الرئيسية" data-cs="Domů">الرئيسية</span></a>
-    <a><i class="fas fa-search"></i><span data-ar="اكتشاف" data-cs="Objevit">اكتشاف</span></a>
-    <a><div class="plus"><i class="fas fa-plus"></i></div><span data-ar="إنشاء" data-cs="Vytvořit">إنشاء</span></a>
-    <a><i class="fas fa-folder-open"></i><span data-ar="المكتبة" data-cs="Knihovna">المكتبة</span></a>
-    <a><i class="fas fa-user-circle"></i><span data-ar="حسابي" data-cs="Účet">حسابي</span></a>
+    <a class="on" data-page="home"><i class="fas fa-home"></i><span data-ar="الرئيسية" data-cs="Domů">الرئيسية</span></a>
+    <a data-page="discover"><i class="fas fa-search"></i><span data-ar="اكتشاف" data-cs="Objevit">اكتشاف</span></a>
+    <a data-page="create"><div class="plus"><i class="fas fa-plus"></i></div><span data-ar="إنشاء" data-cs="Vytvořit">إنشاء</span></a>
+    <a data-page="library"><i class="fas fa-folder-open"></i><span data-ar="المكتبة" data-cs="Knihovna">المكتبة</span></a>
+    <a data-page="profile"><i class="fas fa-user-circle"></i><span data-ar="حسابي" data-cs="Účet">حسابي</span></a>
   </nav>
 </div>
 <script src="app.js"></script>
