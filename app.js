@@ -27,12 +27,25 @@ const translations = {
   }
 };
 
+// قصص الترند الجديدة
+const trendStories = [
+  "في تونس القديمة، كان هناك ساحر يحمي المدينة بقوة غامضة، حتى جاء يوم ظهر فيه تنين أسود يهدد الجميع...",
+  "في سنة 3024، وقع رجل آلي في حب فتاة بشرية، قصة حب مستحيلة لكن القلب لا يعرف المستحيل، حاربا العالم لأجل حبهما...",
+  "دار مهجورة في قرية بعيدة، كل من دخلها سمع أصوات أطفال يضحكون في الليل، حتى جاء شاب قرر كشف السر..."
+];
+
+function useTrend(i){
+  document.getElementById('storyInput').value = trendStories[i];
+  document.querySelectorAll('.style-btn')[i===2?3:i===1?2:0].click();
+  window.scrollTo({top:0, behavior:'smooth'});
+  document.getElementById('storyInput').focus();
+}
+
 let voices = [];
 function loadVoices(){ voices = speechSynthesis.getVoices(); }
 loadVoices();
 if(speechSynthesis.onvoiceschanged!== undefined) speechSynthesis.onvoiceschanged = loadVoices;
 
-// 🔥 تصليح الصوت العربي المكسر
 function cleanArabicText(t){ return t.replace(/[\u064B-\u065F\u0670]/g,'').replace(/[ـ]/g,'').replace(/\s+/g,' ').trim(); }
 function speak(text){
   speechSynthesis.cancel();
@@ -128,18 +141,15 @@ function showResult(story,style,images,voice){
       <button onclick="location.reload()" class="btn" style="width:100%;margin-top:10px;height:58px;border-color:#666;color:#888"><i class="fas fa-home"></i> ${t.backHome}</button>
     </div>
   `;
-
   let cur=0, playing=false, interval, mainImg=document.getElementById('mainAIImg'), playBtn=document.getElementById('playBtn');
   function start(){ playing=true; playBtn.innerHTML='<i class="fas fa-pause"></i>'; speak(story); interval=setInterval(()=>{ cur=(cur+1)%images.length; mainImg.src=images[cur]; [0,1,2].forEach(i=>{ const d=document.getElementById('dot'+i); if(d) d.style.background=i===cur?'#FFC300':'#555'; }); },3000); }
   function stop(){ playing=false; playBtn.innerHTML='<i class="fas fa-play"></i>'; clearInterval(interval); speechSynthesis.cancel(); }
   playBtn.onclick=()=>playing?stop():start();
-
   document.getElementById('downloadBtn').onclick=async()=>{
     const b=document.getElementById('downloadBtn'); b.innerHTML=`<i class="fas fa-spinner fa-spin"></i> ${t.downloading}`;
     for(let i=0;i<images.length;i++) await downloadImage(images[i], `matrix-video-${i+1}.jpg`);
     b.innerHTML=`<i class="fas fa-check"></i> ${currentLang==='ar'?'تم التحميل!':'Staženo!'}`; setTimeout(()=>b.innerHTML=`<i class="fas fa-download"></i> ${t.download}`,2000);
   };
-
   document.getElementById('shareBtn').onclick=()=>{
     const url=images[0]; const text=`شوف الفيديو اللي عملتو بـ Matrix AI 🔥`;
     if(navigator.share && navigator.canShare({title:'Matrix AI', text:text, url:url})){ navigator.share({title:'Matrix AI Video', text:text, url:url}); }
