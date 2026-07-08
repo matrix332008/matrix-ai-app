@@ -1,9 +1,7 @@
 let currentLang = 'ar';
 let currentStyle = 'drama';
 let currentVoice = 'female';
-
-// زيد هذا السطر برك
-const BACKEND_URL = "https://matrix-ai-app.onrender.com";
+const BACKEND_URL = "https://matrix-ai-backend.onrender.com";
 
 function hashCode(s){let h=0;for(let i=0;i<s.length;i++)h=(h<<5)-h+s.charCodeAt(i);return Math.abs(h);}
 
@@ -47,14 +45,12 @@ function useTrend(i){
 let audioPlayer=null, finalVideoBlob=null;
 function stopAudio(){if(audioPlayer){try{audioPlayer.pause();}catch(e){}audioPlayer=null;}try{speechSynthesis.cancel();}catch(e){}}
 
-// *** هذا اللي تصلح - توا صوت تونسي حقيقي ***
 async function speakNatural(text){
   stopAudio();
   const clean=text.replace(/[\u064B-\u065F\u0670ـ]/g,'').replace(/\s+/g,' ').trim().substring(0,800);
   if(!clean) return;
   try{
-    // نحاولو نجيبو صوت تونسي من الـ Backend الجديد
-    const res = await fetch(`${BACKEND_URL}/tts`, {
+    const res = await fetch(`${BACKEND_URL}/video/tts`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ text: clean, voice: currentVoice, lang: currentLang })
@@ -68,7 +64,6 @@ async function speakNatural(text){
     }
     throw new Error('backend fail');
   }catch(e){
-    // كان الـ Backend طايح، نستعملو المؤقت السعودي
     try{
       const voiceName=currentLang==='ar'?(currentVoice==='female'?'Zeina':'Tarik'):(currentVoice==='female'?'Vlasta':'Jan');
       const url=`https://api.streamelements.com/kappa/v2/speech?voice=${voiceName}&text=${encodeURIComponent(clean)}`;
