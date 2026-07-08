@@ -54,10 +54,10 @@ const translations = {
 };
 
 const videoTemplates = {
-  drama: ['https://cdn.pixabay.com/video/2024/02/20/201368-915375272_large.mp4','https://cdn.pixabay.com/video/2023/11/25/190774-888058023_large.mp4'],
-  action: ['https://cdn.pixabay.com/video/2022/11/22/140111-774507553_large.mp4','https://cdn.pixabay.com/video/2024/05/22/213027_large.mp4'],
-  funny: ['https://cdn.pixabay.com/video/2023/10/27/186899-878641412_large.mp4','https://cdn.pixabay.com/video/2022/07/24/125314-734046618_large.mp4'],
-  horror: ['https://cdn.pixabay.com/video/2023/08/23/177636-857251527_large.mp4','https://cdn.pixabay.com/video/2020/07/30/46026-447087782_large.mp4']
+  drama: ['https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4','https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4'],
+  action: ['https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4','https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4'],
+  funny: ['https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4','https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4'],
+  horror: ['https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4','https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4']
 };
 
 let voices = [];
@@ -74,7 +74,7 @@ function speak(text) {
   const utterance = new SpeechSynthesisUtterance(text);
   const langCode = currentLang === 'ar'? 'ar' : 'cs';
   const voiceList = voices.filter(v => v.lang.startsWith(langCode));
-  
+
   if (currentVoice === 'female') {
     utterance.voice = voiceList.find(v => v.name.toLowerCase().includes('female') || v.name.includes('Zuzana') || v.name.includes('Maged')) || voiceList[0];
     utterance.pitch = 1.2;
@@ -82,7 +82,7 @@ function speak(text) {
     utterance.voice = voiceList.find(v => v.name.toLowerCase().includes('male') || v.name.includes('Jakub')) || voiceList[1] || voiceList[0];
     utterance.pitch = 0.9;
   }
-  
+
   utterance.rate = 0.9;
   speechSynthesis.speak(utterance);
 }
@@ -130,7 +130,6 @@ document.querySelectorAll('.style-btn').forEach(btn => {
   };
 });
 
-// جديد: أزرار الصوت موجودين توا في HTML
 document.querySelectorAll('.voice-btn').forEach(btn => {
   btn.onclick = () => {
     document.querySelectorAll('.voice-btn').forEach(b => b.classList.remove('on'));
@@ -142,19 +141,19 @@ document.querySelectorAll('.voice-btn').forEach(btn => {
 document.getElementById('generateBtn').onclick = async () => {
   const story = document.getElementById('storyInput').value.trim();
   if(!story) return alert(translations[currentLang].alertEmpty);
-  
+
   const btn = document.getElementById('generateBtn');
   const loader = document.getElementById('loader');
   btn.disabled = true;
   loader.classList.add('show');
-  
+
   const templates = videoTemplates[currentStyle];
   const videoUrl = templates[Math.floor(Math.random() * templates.length)];
-  
+
   await new Promise(r => setTimeout(r, 2000));
-  
+
   saveVideo(story, currentStyle, videoUrl, currentVoice);
-  
+
   btn.disabled = false;
   loader.classList.remove('show');
   showResult(story, currentStyle, videoUrl, currentVoice);
@@ -164,11 +163,11 @@ function showResult(story, style, videoUrl, voice) {
   const t = translations[currentLang];
   const styleName = document.querySelector(`[data-style="${style}"]`).dataset[currentLang];
   const voiceName = t[voice];
-  
+
   document.querySelector('.wrap').innerHTML = `
     <div style="padding:20px">
       <h2 style="text-align:center;font-size:28px;margin-bottom:20px;font-weight:900">${t.resultTitle}</h2>
-      <video controls autoplay loop style="width:100%;border-radius:18px;border:2px solid #8B5CF6;margin-bottom:20px;max-height:400px;object-fit:cover">
+      <video controls autoplay loop playsinline style="width:100%;border-radius:18px;border:2px solid #8B5CF6;margin-bottom:20px;max-height:400px;object-fit:cover;background:#000">
         <source src="${videoUrl}" type="video/mp4">
       </video>
       <div style="background:#1A1A1A;border:2px solid #8B5CF6;border-radius:18px;padding:18px;margin-bottom:16px">
@@ -193,7 +192,7 @@ function showResult(story, style, videoUrl, voice) {
       </button>
     </div>
   `;
-  
+
   setTimeout(() => speak(story), 500);
 }
 
@@ -224,7 +223,7 @@ document.querySelectorAll('nav a').forEach(btn => {
 function showLibrary() {
   const t = translations[currentLang];
   const videos = getSavedVideos();
-  
+
   if(videos.length === 0) {
     document.querySelector('.wrap').innerHTML = `
       <div style="padding:40px 20px;text-align:center">
@@ -235,16 +234,16 @@ function showLibrary() {
       </div>`;
     return;
   }
-  
+
   document.querySelector('.wrap').innerHTML = `
     <div style="padding:20px">
       <h2 style="text-align:center;font-size:28px;margin-bottom:20px;font-weight:900">${t.library}</h2>
       ${videos.map(v => {
-        const styleName = document.querySelector(`[data-style="${v.style}"]`).dataset[currentLang];
+        const styleName = document.querySelector(`[data-style="${v.style}"]`)? document.querySelector(`[data-style="${v.style}"]`).dataset[currentLang] : v.style;
         const voiceName = t[v.voice || 'female'];
         return `
         <div style="background:#1A1A1A;border:2px solid #8B5CF6;border-radius:16px;padding:12px;margin-bottom:14px">
-          <video style="width:100%;border-radius:12px;margin-bottom:12px" controls>
+          <video style="width:100%;border-radius:12px;margin-bottom:12px;background:#000" controls playsinline>
             <source src="${v.videoUrl}" type="video/mp4">
           </video>
           <div style="font-weight:700;margin-bottom:6px;font-size:15px">${v.story}</div>
@@ -287,7 +286,6 @@ function showProfile() {
           <span style="color:#888">${t.plan}</span>
           <span style="font-weight:800;color:#8B5CF6">${t.free}</span>
         </div>
-      </div>
       <button onclick="goHome()" class="btn" style="width:100%;margin-top:30px;height:58px">
         <i class="fas fa-home"></i> ${t.backHome}
       </button>
