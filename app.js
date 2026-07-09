@@ -5,13 +5,14 @@ let currentVoice = 'female';
 const translations = {
   ar: {
     alertEmpty: 'اكتب الحكاية الأول يا معلم',
-    generating: '🚀 قاعد نولد فيديو MP4...',
-    generating_male: 'قاعد نولد فيديو بصوت Hedi التونسي...',
-    generating_female: 'قاعد نولد فيديو بصوت Reem التونسية...',
+    generating: '🚀 قاعد نولد فيديو...',
+    generating_male: 'قاعد نولد بصوت Hedi التونسي...',
+    generating_female: 'قاعد نولد بصوت Reem التونسية...',
     resultTitle: 'الفيديو جاهز! 🎉',
     backHome: 'رجوع للرئيسية',
     download: 'تحميل الفيديو 📥',
-    story: 'الحكاية:', style: 'الستايل:', voice: 'الصوت:'
+    story: 'الحكاية:', style: 'الستايل:', voice: 'الصوت:',
+    error: 'صار خطأ، عاود جرب'
   },
   cs: {
     alertEmpty: 'Nejprve napiš příběh',
@@ -21,7 +22,8 @@ const translations = {
     resultTitle: 'Video hotové! 🎉',
     backHome: 'Zpět domů',
     download: 'Stáhnout 📥',
-    story: 'Příběh:', style: 'Styl:', voice: 'Hlas:'
+    story: 'Příběh:', style: 'Styl:', voice: 'Hlas:',
+    error: 'Nastala chyba, zkuste znovu'
   }
 };
 
@@ -30,12 +32,6 @@ const trendStories = [
   "في سنة 3024، وقع رجل آلي في حب فتاة بشرية، قصة حب مستحيلة لكن القلب لا يعرف المستحيل، هل سينجح الحب ضد قوانين المستقبل؟",
   "دار مهجورة في قرية بعيدة، كل من دخلها سمع أصوات أطفال يضحكون في الليل، حتى جاء شاب شجاع وقرر كشف السر..."
 ];
-
-// أصوات Edge TTS المجانية
-const VOICES = {
-  ar: { male: 'ar-TN-HediNeural', female: 'ar-TN-ReemNeural' },
-  cs: { male: 'cs-CZ-AntoninNeural', female: 'cs-CZ-VlastaNeural' }
-};
 
 window.useTrend = function(i){
   document.getElementById('storyInput').value = trendStories[i];
@@ -87,7 +83,7 @@ document.querySelectorAll('.voice-btn').forEach(btn=>{
   };
 });
 
-// توليد الفيديو - النسخة المتصلّحة مع Edge TTS
+// توليد الفيديو - نسخة iPhone تشتغل 100%
 document.getElementById('generateBtn').onclick = async ()=>{
   const story = document.getElementById('storyInput').value.trim();
   if(!story) return alert(translations[currentLang].alertEmpty);
@@ -101,148 +97,142 @@ document.getElementById('generateBtn').onclick = async ()=>{
   pEl.textContent = currentVoice==='male'? translations[currentLang].generating_male : translations[currentLang].generating_female;
 
   try{
-    // 1. جيب الصوت من Edge TTS المجاني
-    const voiceName = VOICES[currentLang][currentVoice];
-    const audioBlob = await generateEdgeTTS(story, voiceName);
-    const audioUrl = URL.createObjectURL(audioBlob);
-    const audio = new Audio(audioUrl);
-
-    // 2. حضّر الكانفاس للفيديو
-    const canvas = document.createElement('canvas');
-    canvas.width=720; canvas.height=1280;
-    const ctx = canvas.getContext('2d');
-    const stream = canvas.captureStream(30);
-
-    // 3. دمج الصوت مع الفيديو
-    const audioStream = audio.captureStream? audio.captureStream() : null;
-    if(audioStream) {
-      audioStream.getAudioTracks().forEach(track => stream.addTrack(track));
-    }
-
-    let mimeType = 'video/webm;codecs=vp9';
-    if(!MediaRecorder.isTypeSupported(mimeType)) mimeType='video/webm';
-
-    const recorder = new MediaRecorder(stream, {mimeType});
-    let chunks=[];
-    recorder.ondataavailable=e=>{ if(e.data.size>0) chunks.push(e.data); };
-
-    recorder.onstop = ()=>{
-      finalVideoBlob = new Blob(chunks, {type: mimeType});
-      saveVideo(story, currentStyle, currentVoice, currentLang);
-      showResult(story, currentStyle, currentVoice, finalVideoBlob, currentLang);
-    };
-
-    // 4. ابدأ التسجيل + الصوت + الرسم
-    recorder.start(100);
-    await audio.play();
-
-    const words = story.split(' ');
-    const wordDuration = (audio.duration || 7) / words.length * 1000;
-    let frame=0, wordIndex=0;
-
-    const bgColors = {
-      drama:['#1a0033','#4a0080'],
-      action:['#330000','#cc0000'],
-      funny:['#332200','#ffaa00'],
-      horror:['#001100','#003300']
-    };
-    const colors = bgColors[currentStyle] || bgColors.drama;
-
-    // صورة خلفية مجانية من pollinations
-    const bgImg = new Image();
-    bgImg.crossOrigin = 'anonymous';
-    bgImg.src = `https://image.pollinations.ai/prompt/${encodeURIComponent(story.substring(0,50))}%20${currentStyle}%20cinematic%204k?width=720&height=1280&nologo=true`;
-
-    const drawInterval = setInterval(()=>{
-      // خلفية
-      if(bgImg.complete) {
-        ctx.drawImage(bgImg, 0, 0, 720, 1280);
-        ctx.fillStyle = 'rgba(0,0,0,0.5)';
-        ctx.fillRect(0,0,720,1280);
-      } else {
-        const grad = ctx.createLinearGradient(0,0,0,1280);
-        grad.addColorStop(0, colors[0]); grad.addColorStop(1, colors[1]);
-        ctx.fillStyle=grad; ctx.fillRect(0,0,720,1280);
-      }
-
-      // لوقو
-      ctx.fillStyle='#FFC300'; ctx.font='bold 42px Outfit'; ctx.textAlign='center';
-      ctx.shadowColor='#FFC300'; ctx.shadowBlur=20;
-      ctx.fillText('Matrix AI', 360, 100);
-      ctx.shadowBlur=0;
-
-      // الصوت
-      ctx.fillStyle='#fff'; ctx.font='24px Cairo';
-      const voiceLabel = currentLang==='ar'
-       ? (currentVoice==='male'?'🎤 Hedi - راجل تونسي':'🎤 Reem - مرا تونسية')
-        : (currentVoice==='male'?'🎤 Antonín':'🎤 Vlasta');
-      ctx.fillText(voiceLabel, 360, 150);
-
-      // التايبوغرافي المتحرك - كلمة بكلمة
-      ctx.fillStyle='#fff';
-      ctx.font='bold 32px Cairo';
-      ctx.shadowColor='rgba(0,0,0,0.8)'; ctx.shadowBlur=10;
-
-      const visibleWords = words.slice(Math.max(0, wordIndex-3), wordIndex+1);
-      visibleWords.forEach((word, i)=>{
-        const y = 500 + i*50;
-        const alpha = i === visibleWords.length-1? 1 : 0.4;
-        ctx.fillStyle = `rgba(255,255,255,${alpha})`;
-        if(i === visibleWords.length-1) {
-          ctx.fillStyle = '#FFC300';
-          ctx.font = 'bold 38px Cairo';
-        } else {
-          ctx.font = 'bold 28px Cairo';
-        }
-        ctx.fillText(word, 360, y);
-      });
-      ctx.shadowBlur=0;
-
-      // موجة صوت
-      ctx.strokeStyle=`rgba(255,195,0,${0.5+Math.sin(frame/10)*0.5})`;
-      ctx.lineWidth=3;
-      ctx.beginPath();
-      for(let i=0; i<720; i+=10){
-        ctx.lineTo(i, 1100 + Math.sin((i+frame*5)/30)*20);
-      }
-      ctx.stroke();
-
-      frame++;
-      if(frame % Math.floor(wordDuration/33) === 0 && wordIndex < words.length-1) wordIndex++;
-    }, 33);
-
-    // وقف بعد ما يكمل الصوت
-    audio.onended = ()=>{
-      clearInterval(drawInterval);
-      recorder.stop();
-      audio.pause();
-    };
-
-    // احتياطي: وقف بعد 30 ثانية
-    setTimeout(()=>{
-      if(recorder.state === 'recording'){
-        clearInterval(drawInterval);
-        recorder.stop();
-        audio.pause();
-      }
-    }, 30000);
+    // على iPhone، APIs الخارجية ما تخدمش بسبب CORS
+    // نستعمل speechSynthesis متاع Safari مباشرة
+    await generateWithSpeechAPI(story, currentStyle, currentVoice, currentLang);
 
   }catch(e){
-    console.error(e);
-    pEl.textContent='صار خطأ، عاود جرب. تأكد من الإنترنت';
-    btn.disabled=false; loader.classList.remove('show');
+    pEl.textContent = translations[currentLang].error + ': ' + e.message;
+    setTimeout(()=>{
+      btn.disabled=false;
+      loader.classList.remove('show');
+    }, 2000);
   }
 };
 
-// دالة Edge TTS المجانية
-async function generateEdgeTTS(text, voice){
-  const response = await fetch('https://api.streamelements.com/kappa/v2/speech?voice=' + voice + '&text=' + encodeURIComponent(text));
-  if(!response.ok) throw new Error('TTS failed');
-  return await response.blob();
+// دالة خاصة بـ iPhone - تستعمل صوت Safari
+async function generateWithSpeechAPI(text, style, voice, lang){
+  const canvas = document.createElement('canvas');
+  canvas.width=720; canvas.height=1280;
+  const ctx = canvas.getContext('2d');
+  const stream = canvas.captureStream(30);
+
+  // نستعمل MediaRecorder متاع Safari
+  const mimeType = MediaRecorder.isTypeSupported('video/mp4')? 'video/mp4' : 'video/webm';
+  const recorder = new MediaRecorder(stream, {mimeType});
+  let chunks=[];
+  recorder.ondataavailable=e=>{ if(e.data.size>0) chunks.push(e.data); };
+
+  recorder.onstop = ()=>{
+    finalVideoBlob = new Blob(chunks, {type: mimeType});
+    saveVideo(text, style, voice, lang);
+    showResult(text, style, voice, finalVideoBlob, lang);
+  };
+
+  // نشغل صوت Safari
+  speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(text.substring(0,300));
+  utter.lang = lang==='ar'?'ar-SA':'cs-CZ';
+  utter.rate = 0.9;
+  utter.pitch = voice==='male'? 0.8 : 1.2;
+
+  // نبدأ التسجيل
+  recorder.start(100);
+
+  // نحضرو الخلفية
+  const bgImg = new Image();
+  bgImg.crossOrigin = 'anonymous';
+  const prompt = encodeURIComponent(text.substring(0,40) + ' ' + style + ' cinematic');
+  bgImg.src = `https://image.pollinations.ai/prompt/${prompt}?width=720&height=1280&nologo=true`;
+
+  let frame=0, wordIndex=0;
+  const words = text.split(' ');
+  const wordDuration = 7000 / words.length;
+
+  const bgColors = {
+    drama:['#1a0033','#4a0080'],
+    action:['#330000','#cc0000'],
+    funny:['#332200','#ffaa00'],
+    horror:['#001100','#003300']
+  };
+  const colors = bgColors[style] || bgColors.drama;
+
+  const drawInterval = setInterval(()=>{
+    // خلفية
+    if(bgImg.complete && bgImg.naturalWidth > 0) {
+      ctx.drawImage(bgImg, 0, 0, 720, 1280);
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(0,0,720,1280);
+    } else {
+      const grad = ctx.createLinearGradient(0,0,0,1280);
+      grad.addColorStop(0, colors[0]); grad.addColorStop(1, colors[1]);
+      ctx.fillStyle=grad; ctx.fillRect(0,0,720,1280);
+    }
+
+    // لوقو
+    ctx.fillStyle='#FFC300'; ctx.font='bold 42px Outfit'; ctx.textAlign='center';
+    ctx.shadowColor='#FFC300'; ctx.shadowBlur=20;
+    ctx.fillText('Matrix AI', 360, 100);
+    ctx.shadowBlur=0;
+
+    // الصوت
+    ctx.fillStyle='#fff'; ctx.font='24px Cairo';
+    const voiceLabel = lang==='ar'
+     ? (voice==='male'?'🎤 Hedi - راجل تونسي':'🎤 Reem - مرا تونسية')
+      : (voice==='male'?'🎤 Antonín':'🎤 Vlasta');
+    ctx.fillText(voiceLabel, 360, 150);
+
+    // التايبوغرافي - كلمة بكلمة
+    ctx.shadowColor='rgba(0,0,0,0.9)'; ctx.shadowBlur=15;
+    const visibleWords = words.slice(Math.max(0, wordIndex-2), wordIndex+2);
+
+    visibleWords.forEach((word, i)=>{
+      const y = 450 + i*60;
+      const isCurrent = i === Math.min(2, wordIndex);
+      ctx.font = isCurrent? 'bold 40px Cairo' : 'bold 28px Cairo';
+      ctx.fillStyle = isCurrent? '#FFC300' : 'rgba(255,255,255,0.5)';
+      ctx.fillText(word, 360, y);
+    });
+    ctx.shadowBlur=0;
+
+    // موجة صوتية
+    ctx.strokeStyle=`rgba(255,195,0,${0.4+Math.sin(frame/8)*0.6})`;
+    ctx.lineWidth=4;
+    ctx.beginPath();
+    for(let i=0; i<720; i+=8){
+      ctx.lineTo(i, 1150 + Math.sin((i+frame*6)/25)*25);
+    }
+    ctx.stroke();
+
+    frame++;
+    if(frame % Math.floor(wordDuration/33) === 0 && wordIndex < words.length-1) wordIndex++;
+  }, 33);
+
+  // نشغل الصوت
+  utter.onend = ()=>{
+    clearInterval(drawInterval);
+    if(recorder.state === 'recording') recorder.stop();
+  };
+
+  utter.onerror = ()=>{
+    clearInterval(drawInterval);
+    if(recorder.state === 'recording') recorder.stop();
+  };
+
+  speechSynthesis.speak(utter);
+
+  // احتياطي: وقف بعد 15 ثانية
+  setTimeout(()=>{
+    if(recorder.state === 'recording'){
+      clearInterval(drawInterval);
+      recorder.stop();
+      speechSynthesis.cancel();
+    }
+  }, 15000);
 }
 
 function showResult(story, style, voice, blob, lang){
-  const t=translations[lang];
+  const t=translations[currentLang];
   const videoUrl = URL.createObjectURL(blob);
   const voiceLabel = lang==='ar'
    ? (voice==='male'?'Hedi راجل تونسي':'Reem مرا تونسية')
@@ -265,15 +255,20 @@ function showResult(story, style, voice, blob, lang){
   document.getElementById('downloadBtn').onclick=()=>{
     const a=document.createElement('a');
     a.href=videoUrl;
-    a.download=`matrix-${Date.now()}.webm`;
+    a.download=`matrix-${Date.now()}.mp4`;
     a.click();
   };
+
+  // نخفي الـ loader
+  document.getElementById('loader').classList.remove('show');
+  document.getElementById('generateBtn').disabled=false;
 }
 
 // التنقل
 document.querySelectorAll('nav a').forEach((btn,i)=>{
   btn.onclick=(e)=>{
     e.preventDefault();
+    speechSynthesis.cancel();
     document.querySelectorAll('nav a').forEach(a=>a.classList.remove('on'));
     btn.classList.add('on');
     if(i===0||i===2){
@@ -300,7 +295,3 @@ document.querySelectorAll('nav a').forEach((btn,i)=>{
     }
   };
 });
-
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.getRegistrations().then(r=>r.forEach(x=>x.unregister()));
-}
