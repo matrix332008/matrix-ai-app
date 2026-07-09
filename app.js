@@ -1,6 +1,13 @@
 let currentLang = 'ar';
 let currentStyle = 'drama';
 let currentVoice = 'female';
+let audioReady = false;
+let userInteracted = false;
+
+// نحمل ResponsiveVoice - صوت عربي وتشيكي مجاني يخدم على iPhone
+const script = document.createElement('script');
+script.src = 'https://code.responsivevoice.org/responsivevoice.js?key=demo';
+document.head.appendChild(script);
 
 const translations = {
   ar: {
@@ -12,21 +19,28 @@ const translations = {
     backHome: 'رجوع للرئيسية',
     download: 'تحميل الفيديو 📥',
     story: 'الحكاية:', style: 'الستايل:', voice: 'الصوت:',
-    error: 'لازم تضغط على الشاشة باش الصوت يخدم',
-    tapToPlay: 'اضغط هنا باش تسمع الصوت 🔊'
+    error: 'صار خطأ، عاود جرب',
+    tapToPlay: 'اضغط هنا باش نبداو 🔊',
+    preparing: 'نحضّرو في الصوت...'
   },
   cs: {
     alertEmpty: 'Nejprve napiš příběh',
     generating: '🚀 Připravuji video...',
-    generating_male: 'Generuji s hlasem Antonín...',
-    generating_female: 'Generuji s hlasem Vlasta...',
+    generating_male: 'Generuji s mužským hlasem...',
+    generating_female: 'Generuji s ženským hlasem...',
     resultTitle: 'Video hotové! 🎉',
     backHome: 'Zpět domů',
     download: 'Stáhnout 📥',
     story: 'Příběh:', style: 'Styl:', voice: 'Hlas:',
-    error: 'Klepněte na obrazovku pro přehrání zvuku',
-    tapToPlay: 'Klepněte pro přehrání zvuku 🔊'
+    error: 'Nastala chyba, zkuste znovu',
+    tapToPlay: 'Klepněte pro spuštění 🔊',
+    preparing: 'Připravuji zvuk...'
   }
+};
+
+const VOICES = {
+  ar: { male: 'Arabic Male', female: 'Arabic Female' },
+  cs: { male: 'Czech Male', female: 'Czech Female' }
 };
 
 const trendStories = [
@@ -42,7 +56,6 @@ window.useTrend = function(i){
 }
 
 let finalVideoBlob = null;
-let audioElement = null;
 
 function getSavedVideos(){ return JSON.parse(localStorage.getItem('matrix_videos')||'[]'); }
 function saveVideo(s,st,vc,lang){
@@ -86,81 +99,83 @@ document.querySelectorAll('.voice-btn').forEach(btn=>{
   };
 });
 
-// توليد الفيديو - نسخة iPhone
+// توليد الفيديو - نسخة iPhone نهائية
 document.getElementById('generateBtn').onclick = async ()=>{
   const story = document.getElementById('storyInput').value.trim();
   if(!story) return alert(translations[currentLang].alertEmpty);
 
   const btn = document.getElementById('generateBtn');
   const loader = document.getElementById('loader');
-  const pEl = loader.querySelector('p');
 
   btn.disabled=true;
   loader.classList.add('show');
-  pEl.textContent = currentVoice==='male'? translations[currentLang].generating_male : translations[currentLang].generating_female;
+  loader.innerHTML = `
+    <div style="text-align:center">
+      <p style="color:#FFC300;font-size:18px;margin-bottom:20px">${translations[currentLang].tapToPlay}</p>
+      <button id="startBtn" class="big" style="width:220px;margin:0 auto">▶️ Start</button>
+    </div>
+  `;
 
-  try{
-    // iPhone لازم يجيب الصوت من API خارجي خاطر speechSynthesis خايب
-    const audioUrl = await getAudioFromAPI(story, currentLang, currentVoice);
+  document.getElementById('startBtn').onclick = async ()=>{
+    userInteracted = true;
+    loader.innerHTML = `<div class="spinner"></div><p>${translations[currentLang].preparing}</p>`;
 
-    // نولدو الفيديو مع الصوت
-    await generateVideoWithAudio(story, currentStyle, currentVoice, currentLang, audioUrl);
-
-  }catch(e){
-    console.error(e);
-    pEl.textContent = translations[currentLang].error;
-    setTimeout(()=>{
-      btn.disabled=false;
-      loader.classList.remove('show');
-    }, 3000);
-  }
+    try{
+      await waitForResponsiveVoice();
+      await generateVideo(story, currentStyle, currentVoice, currentLang);
+    }catch(e){
+      console.error(e);
+      loader.innerHTML = `<p style="color:#FF3B30">${translations[currentLang].error}</p>`;
+      setTimeout(()=>{
+        btn.disabled=false;
+        loader.classList.remove('show');
+      }, 2000);
+    }
+  };
 };
 
-// API مجاني يخدم على iPhone - VoiceRSS
-async function getAudioFromAPI(text, lang, voice){
-  const langCode = lang==='ar'?'ar-sa':'cs-cz';
-  // VoiceRSS يعطي 350 طلب مجاني في اليوم
-  const url = `https://api.voicerss.org/?key=demo&hl=${langCode}&src=${encodeURIComponent(text.substring(0,500))}&r=0&c=MP3&f=48khz_16bit_stereo&v=${voice==='male'?'Oda':'Linda'}`;
-
-  const response = await fetch(url);
-  if(!response.ok) throw new Error('TTS API failed');
-  return URL.createObjectURL(await response.blob());
+function waitForResponsiveVoice(){
+  return new Promise((resolve)=>{
+    if(typeof responsiveVoice!== 'undefined' && responsiveVoice.voiceSupport()){
+      resolve();
+    } else {
+      setTimeout(()=>waitForResponsiveVoice().then(resolve), 200);
+    }
+  });
 }
 
-// توليد الفيديو مع الصوت
-async function generateVideoWithAudio(text, style, voice, lang, audioUrl){
+async function generateVideo(text, style, voice, lang){
+  const loader = document.getElementById('loader');
+  loader.querySelector('p').textContent = voice==='male'? translations[lang].generating_male : translations[lang].generating_female;
+
   const canvas = document.createElement('canvas');
   canvas.width=720; canvas.height=1280;
   const ctx = canvas.getContext('2d');
 
-  // نحضرو الصوت
-  audioElement = new Audio(audioUrl);
-  audioElement.crossOrigin = 'anonymous';
-
-  // نسجلو الفيديو
+  // نسجلو الفيديو بدون صوت الأول
   const stream = canvas.captureStream(30);
-  const audioStream = audioElement.captureStream();
-  audioStream.getAudioTracks().forEach(track => stream.addTrack(track));
-
   const mimeType = MediaRecorder.isTypeSupported('video/mp4')? 'video/mp4' : 'video/webm';
   const recorder = new MediaRecorder(stream, {mimeType});
   let chunks=[];
   recorder.ondataavailable=e=>{ if(e.data.size>0) chunks.push(e.data); };
 
-  recorder.onstop = ()=>{
-    finalVideoBlob = new Blob(chunks, {type: mimeType});
-    saveVideo(text, style, voice, lang);
-    showResult(text, style, voice, finalVideoBlob, lang);
-  };
+  const videoPromise = new Promise(resolve=>{
+    recorder.onstop = ()=>{
+      finalVideoBlob = new Blob(chunks, {type: mimeType});
+      resolve();
+    };
+  });
 
-  // خلفية
+  // نحضرو الخلفية
   const bgImg = new Image();
   bgImg.crossOrigin = 'anonymous';
-  const prompt = encodeURIComponent(text.substring(0,40) + ' ' + style + ' cinematic dark');
-  bgImg.src = `https://image.pollinations.ai/prompt/${prompt}?width=720&height=1280&nologo=true&seed=${Math.floor(Math.random()*1000)}`;
+  const prompt = encodeURIComponent(text.substring(0,40) + ' ' + style + ' cinematic dark moody');
+  bgImg.src = `https://image.pollinations.ai/prompt/${prompt}?width=720&height=1280&nologo=true&seed=${Date.now()}`;
 
   let frame=0, wordIndex=0;
   const words = text.split(' ');
+  const totalDuration = Math.max(8000, words.length * 400); // 400ms لكل كلمة
+  const wordDuration = totalDuration / words.length;
 
   const bgColors = {
     drama:['#1a0033','#4a0080'],
@@ -170,11 +185,24 @@ async function generateVideoWithAudio(text, style, voice, lang, audioUrl){
   };
   const colors = bgColors[style] || bgColors.drama;
 
-  const drawFrame = ()=>{
+  recorder.start(100);
+
+  // نشغلو الصوت
+  const voiceName = VOICES[lang][voice];
+  responsiveVoice.speak(text, voiceName, {
+    rate: 0.9,
+    onend: ()=>{
+      setTimeout(()=>{
+        if(recorder.state === 'recording') recorder.stop();
+      }, 500);
+    }
+  });
+
+  const drawInterval = setInterval(()=>{
     // خلفية
     if(bgImg.complete && bgImg.naturalWidth > 0) {
       ctx.drawImage(bgImg, 0, 0, 720, 1280);
-      ctx.fillStyle = 'rgba(0,0,0,0.65)';
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
       ctx.fillRect(0,0,720,1280);
     } else {
       const grad = ctx.createLinearGradient(0,0,0,1280);
@@ -183,83 +211,57 @@ async function generateVideoWithAudio(text, style, voice, lang, audioUrl){
     }
 
     // لوقو
-    ctx.fillStyle='#FFC300'; ctx.font='bold 46px Outfit'; ctx.textAlign='center';
-    ctx.shadowColor='#FFC300'; ctx.shadowBlur=25;
-    ctx.fillText('Matrix AI', 360, 110);
+    ctx.fillStyle='#FFC300'; ctx.font='bold 48px Outfit'; ctx.textAlign='center';
+    ctx.shadowColor='#FFC300'; ctx.shadowBlur=30;
+    ctx.fillText('Matrix AI', 360, 120);
     ctx.shadowBlur=0;
 
     // اسم الصوت
     ctx.fillStyle='#fff'; ctx.font='26px Cairo';
     const voiceLabel = lang==='ar'
-    ? (voice==='male'?'🎤 صوت تونسي':'🎤 صوت تونسية')
-      : (voice==='male'?'🎤 Antonín':'🎤 Vlasta');
-    ctx.fillText(voiceLabel, 360, 160);
+   ? (voice==='male'?'🎤 صوت تونسي':'🎤 صوت تونسية')
+      : (voice==='male'?'🎤 Český hlas':'🎤 Český hlas');
+    ctx.fillText(voiceLabel, 360, 170);
 
-    // النص - كلمة بكلمة
-    ctx.shadowColor='rgba(0,0,0,1)'; ctx.shadowBlur=20;
+    // التايبوغرافي
+    ctx.shadowColor='rgba(0,0,0,1)'; ctx.shadowBlur=25;
     const visibleWords = words.slice(Math.max(0, wordIndex-1), wordIndex+3);
 
     visibleWords.forEach((word, i)=>{
-      const y = 500 + i*70;
+      const y = 480 + i*75;
       const isCurrent = i === Math.min(1, wordIndex);
-      ctx.font = isCurrent? 'bold 44px Cairo' : 'bold 32px Cairo';
-      ctx.fillStyle = isCurrent? '#FFC300' : 'rgba(255,255,255,0.6)';
+      ctx.font = isCurrent? 'bold 46px Cairo' : 'bold 34px Cairo';
+      ctx.fillStyle = isCurrent? '#FFC300' : 'rgba(255,255,255,0.5)';
       ctx.fillText(word, 360, y);
     });
     ctx.shadowBlur=0;
 
     // موجة صوتية
-    ctx.strokeStyle=`rgba(255,195,0,${0.5+Math.sin(frame/6)*0.5})`;
-    ctx.lineWidth=5;
+    ctx.strokeStyle=`rgba(255,195,0,${0.6+Math.sin(frame/5)*0.4})`;
+    ctx.lineWidth=6;
     ctx.beginPath();
-    for(let i=0; i<720; i+=6){
-      ctx.lineTo(i, 1160 + Math.sin((i+frame*8)/20)*30);
+    for(let i=0; i<720; i+=5){
+      ctx.lineTo(i, 1180 + Math.sin((i+frame*10)/15)*35);
     }
     ctx.stroke();
 
     frame++;
-  };
+    if(frame % Math.floor(wordDuration/33) === 0 && wordIndex < words.length-1) wordIndex++;
+  }, 33);
 
-  // نبداو التسجيل
-  recorder.start(100);
+  await videoPromise;
+  clearInterval(drawInterval);
 
-  // نشغلو الصوت - iPhone لازم user interaction
-  audioElement.onplay = ()=>{
-    const wordDuration = (audioElement.duration * 1000) / words.length;
-    const drawInterval = setInterval(()=>{
-      drawFrame();
-      if(frame % Math.floor(wordDuration/33) === 0 && wordIndex < words.length-1) wordIndex++;
-    }, 33);
-
-    audioElement.onended = ()=>{
-      clearInterval(drawInterval);
-      setTimeout(()=>{ if(recorder.state === 'recording') recorder.stop(); }, 500);
-    };
-  };
-
-  // iPhone لازم نوري button باش المستخدم يضغط
-  document.getElementById('loader').innerHTML = `
-    <div style="text-align:center">
-      <p style="color:#FFC300;font-size:18px;margin-bottom:20px">${translations[currentLang].tapToPlay}</p>
-      <button id="playBtn" class="big" style="width:200px;margin:0 auto">▶️ Play</button>
-    </div>
-  `;
-
-  document.getElementById('playBtn').onclick = ()=>{
-    audioElement.play().catch(e=>console.error(e));
-    document.getElementById('loader').innerHTML = `
-      <div class="spinner"></div>
-      <p>${translations[currentLang].generating}</p>
-    `;
-  };
+  saveVideo(text, style, voice, lang);
+  showResult(text, style, voice, finalVideoBlob, lang);
 }
 
 function showResult(story, style, voice, blob, lang){
-  const t=translations[currentLang];
+  const t=translations[lang];
   const videoUrl = URL.createObjectURL(blob);
   const voiceLabel = lang==='ar'
-  ? (voice==='male'?'صوت تونسي':'صوت تونسية')
-    : (voice==='male'?'Antonín':'Vlasta');
+ ? (voice==='male'?'صوت تونسي':'صوت تونسية')
+    : (voice==='male'?'Český muž':'Česká žena');
 
   document.querySelector('.wrap').innerHTML=`
     <div style="padding:20px">
@@ -290,7 +292,7 @@ function showResult(story, style, voice, blob, lang){
 document.querySelectorAll('nav a').forEach((btn,i)=>{
   btn.onclick=(e)=>{
     e.preventDefault();
-    if(audioElement) audioElement.pause();
+    if(typeof responsiveVoice!== 'undefined') responsiveVoice.cancel();
     document.querySelectorAll('nav a').forEach(a=>a.classList.remove('on'));
     btn.classList.add('on');
     if(i===0||i===2){
@@ -305,8 +307,8 @@ document.querySelectorAll('nav a').forEach((btn,i)=>{
         let h=`<div style="padding:20px"><h2 style="text-align:center">📚 ${currentLang==='ar'?'المكتبة':'Knihovna'} - ${vids.length}</h2>`;
         vids.forEach(v=>{
           const vLabel = v.lang==='ar'
-          ? (v.voice==='male'?'راجل':'مرا')
-            : (v.voice==='male'?'Antonín':'Vlasta');
+         ? (v.voice==='male'?'راجل':'مرا')
+            : (v.voice==='male'?'Muž':'Žena');
           h+=`<div style="background:#1A1A1A;border:1px solid #8B5CF6;border-radius:12px;padding:12px;margin:10px 0"><div style="font-weight:700">${v.story.substring(0,70)}...</div><div style="color:#FFC300;font-size:12px;margin-top:4px">${v.date} - ${vLabel} - ${v.style}</div></div>`;
         });
         h+=`<button onclick="location.reload()" class="big">🏠 ${currentLang==='ar'?'رجوع للرئيسية':'Zpět domů'}</button></div>`;
